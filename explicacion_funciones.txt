@@ -1,0 +1,344 @@
+================================================================================
+          GUÍA TÉCNICA Y EXPLICACIÓN DE FUNCIONES: MUNDO DEL WUMPUS
+================================================================================
+Archivo analizado: wunpus.py
+Lenguaje: Python 3
+Estructura de datos principal: Grafo no dirigido (Lista de Adyacencia con Diccionario)
+Algoritmos clave: Búsqueda en Anchura (BFS), Raycasting en Línea Recta, Análisis de Texto (Regex)
+================================================================================
+
+
+1. CLASE PRINCIPAL: MundoWumpus
+--------------------------------------------------------------------------------
+Representa el estado completo de la cueva, las posiciones de los elementos, las
+reglas físicas del entorno y la lógica de interacción del jugador y criaturas.
+
+
+1.1. __init__(self, tamano=4)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Es el constructor de la clase. Se ejecuta automáticamente al instanciar el juego.
+Funcionamiento en programación:
+  - Inicializa el tamaño de la cuadrícula (por defecto 4x4, es decir, 16 nodos).
+  - Inicializa el diccionario `self.grafo = {}` y llama a `self.construir_grafo()`
+    para crear las conexiones entre habitaciones.
+  - Define las variables de estado:
+      * `self.pos_jugador`: Tupla (x, y) con la posición del jugador, inicia en (0, 0).
+      * `self.pos_wumpus`, `self.pos_oro`: Tuplas de coordenadas.
+      * `self.pos_pozos`: Lista de tuplas con las habitaciones que tienen pozos.
+      * `self.pos_murcielagos`: Lista con la habitación de los murciélagos.
+      * `self.pos_derrumbe`: Tupla con la habitación de techo inestable.
+      * `self.derrumbe_ocurrido`: Booleano para asegurar que el derrumbe solo pase 1 vez.
+      * `self.bloqueos`: Conjunto (set) de aristas que han quedado selladas por rocas.
+      * `self.vivo`: Booleano que indica si el jugador sigue con vida.
+      * `self.tiene_oro`: Booleano que indica si el jugador recogió el oro.
+      * `self.wumpus_vivo`: Booleano que indica si el monstruo sigue con vida.
+      * `self.modo_caceria`: Booleano que activa la persecución activa al coger el oro.
+      * `self.turnos_caceria`: Contador de movimientos para regular la velocidad del Wumpus.
+      * `self.flechas`: Entero con la munición disponible (inicia con 1).
+      * `self.piedras`: Entero con las piedras para tantear/distraer (inicia con 3).
+      * `self.habitaciones_visitadas`: Conjunto (set) con las casillas exploradas.
+  - Llama a `self.inicializar_elementos()` para posicionar el juego en el mapa.
+
+
+1.2. construir_grafo(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Crea la topología de la cueva como un grafo no dirigido en forma de cuadrícula.
+Funcionamiento en programación:
+  - Realiza un doble bucle `for x` y `for y` de 0 a `tamano - 1`.
+  - Para cada celda `(x, y)`, evalúa si existen casillas vecinas válidas:
+      * Si x > 0: agrega vecino a la izquierda `(x - 1, y)`.
+      * Si x < tamano - 1: agrega vecino a la derecha `(x + 1, y)`.
+      * Si y > 0: agrega vecino abajo `(x, y - 1)`.
+      * Si y < tamano - 1: agrega vecino arriba `(x, y + 1)`.
+  - Guarda en `self.grafo[(x, y)]` la lista de vecinos directos. Al ser conexiones
+    mutuas, el grafo es no dirigido y bidireccional.
+
+
+1.3. _existe_camino_seguro(self, inicio, destino)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Verifica si es físicamente posible caminar desde `inicio` hasta `destino` sin
+  caer en ningún pozo.
+Funcionamiento en programación:
+  - Implementa el algoritmo BFS (Breadth-First Search / Búsqueda en Anchura)
+    utilizando una cola eficiente (`collections.deque`).
+  - Utiliza un conjunto `visitados` para no entrar en bucles infinitos.
+  - Mientras haya nodos en la cola, extrae el nodo actual (`cola.popleft()`).
+  - Si el nodo actual coincide con `destino`, retorna `True`.
+  - Explora cada vecino en `self.grafo[actual]`: si el vecino NO es un pozo y no
+    ha sido visitado, lo marca y lo encola.
+  - Si la cola se vacía sin alcanzar el destino, retorna `False` (camino bloqueado).
+
+
+1.4. _obtener_camino_wumpus(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Calcula la ruta más corta paso a paso para que el Wumpus persiga al jugador.
+Funcionamiento en programación:
+  - Implementa BFS guardando la lista completa de coordenadas del camino recorrido:
+    `cola = deque([[self.pos_wumpus]])`.
+  - En cada paso, examina el último nodo del camino. Si es la casilla del jugador,
+    devuelve la lista completa de nodos que componen la ruta más corta.
+  - Si no, expande a todos los vecinos seguros (que no sean pozos) creando nuevos
+    caminos y encolándolos.
+  - Si no existe ruta posible sin pozos, retorna `None`.
+
+
+1.5. _distancia_al_jugador(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Calcula cuántas habitaciones separan al Wumpus del jugador.
+Funcionamiento en programación:
+  - Llama a `_obtener_camino_wumpus()`. Si existe camino, la distancia es
+    `len(camino) - 1` (cantidad de pasos).
+  - Si el camino está interrumpido por pozos, usa la distancia Manhattan
+    `|x1 - x2| + |y1 - y2|` como estimación de respaldo.
+
+
+1.6. inicializar_elementos(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Ubica aleatoriamente todos los peligros y objetos asegurando que el juego sea ganable.
+Funcionamiento en programación:
+  - Ejecuta un bucle `while True` que solo termina cuando el mapa es solucionable.
+  - Extrae todas las casillas del grafo y remueve obligatoriamente `(0, 0)` para que
+    el jugador siempre nazca en una casilla segura.
+  - Elige aleatoriamente la casilla del Wumpus (`random.choice`) y la remueve.
+  - Elige la casilla del Oro y la remueve.
+  - Elige la casilla de los Murciélagos gigantes y la remueve.
+  - Elige la casilla del Derrumbe inestable y la remueve.
+  - En las casillas restantes, asigna un 20% de probabilidad (`random.random() < 0.2`)
+    de colocar un pozo.
+  - Llama a `self._existe_camino_seguro((0, 0), self.pos_oro)`. Si existe una ruta
+    segura garantizada desde el inicio hasta el oro, sale del bucle (`break`).
+    Si los pozos encerraron al jugador o al oro, repite la generación.
+
+
+1.7. percibir(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Genera las pistas sensoriales que experimenta el jugador en su habitación actual.
+Funcionamiento en programación:
+  - Obtiene la lista de vecinos inmediatos del jugador mediante `self.grafo[self.pos_jugador]`.
+  - Evalúa condiciones:
+      * Hedor: Si el Wumpus está vivo y está en una habitación vecina o en la misma.
+      * Brisa: Si al menos uno de los vecinos pertenece a `self.pos_pozos`.
+      * Aleteo: Si al menos uno de los vecinos contiene murciélagos gigantes.
+      * Crujido: Si la habitación de derrumbe es vecina y aún no ha colapsado.
+      * Brillo: Si el jugador está sobre la casilla del oro y aún no lo ha agarrado.
+  - Retorna una lista de strings con las percepciones activas.
+
+
+1.8. mover_wumpus_aleatorio(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Desplaza al Wumpus a una habitación adyacente al azar (usado al alertarse por ruido).
+Funcionamiento en programación:
+  - Si el Wumpus está muerto, termina inmediatamente.
+  - Filtra los vecinos de `self.pos_wumpus` que NO sean pozos (`candidatos`).
+  - Si hay candidatos, elige uno al azar y actualiza `self.pos_wumpus`.
+  - Si el Wumpus se mueve a la misma habitación del jugador, llama a `verificar_estado()`.
+
+
+1.9. cazar_jugador(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Controla la inteligencia de persecución activa del Wumpus durante el modo cacería.
+Funcionamiento en programación:
+  - Verifica que el Wumpus esté vivo y que `self.modo_caceria` sea `True`.
+  - Invoca `_obtener_camino_wumpus()`.
+  - Si el camino tiene al menos 2 nodos, toma el nodo `camino[1]` (el siguiente paso)
+    y mueve al Wumpus a esa posición.
+  - Calcula la distancia restante. Si llegó a la casilla del jugador, imprime la
+    alerta de embestida y llama a `verificar_estado()` para matarlo.
+  - Si no, notifica al jugador a cuántas habitaciones de distancia se encuentra.
+
+
+1.10. activar_derrumbe(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Simula el colapso del techo en la zona inestable y modifica dinámicamente el grafo.
+Funcionamiento en programación:
+  - Marca `self.derrumbe_ocurrido = True` para evitar activaciones repetidas.
+  - Obtiene los vecinos de la casilla y los mezcla aleatoriamente (`random.shuffle`).
+  - Intenta eliminar una arista `(pos, v)` del grafo:
+      * Remueve temporalmente `v` de `self.grafo[pos]` y `pos` de `self.grafo[v]`.
+      * Comprueba mediante `_existe_camino_seguro` si el jugador aún puede llegar a (0,0)
+        y al oro.
+      * Si el camino sigue siendo viable, consolida el derrumbe: agrega la arista a
+        `self.bloqueos` y rompe el bucle (el túnel queda permanentemente sellado).
+      * Si la eliminación aislaba al jugador, restaura la conexión (`append`) y prueba
+        con otro túnel.
+
+
+1.11. mover(self, nueva_pos)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Valida y ejecuta el desplazamiento del jugador a una habitación vecina.
+Funcionamiento en programación:
+  - Verifica si `nueva_pos` está en la lista de adyacencia `self.grafo[self.pos_jugador]`.
+  - Si es válida:
+      * Actualiza `self.pos_jugador = nueva_pos`.
+      * Registra la habitación en `self.habitaciones_visitadas`.
+      * Si la casilla es la zona de derrumbe inestable, llama a `activar_derrumbe()`.
+      * Llama a `verificar_estado()` (por si entró a un pozo o al Wumpus).
+      * Si sigue vivo, llama a `verificar_murcielagos()`.
+      * Si sigue vivo y está en cacería, incrementa `self.turnos_caceria`. Cada 2 turnos
+        pares (`turnos_caceria % 2 == 0`) invoca a `self.cazar_jugador()`; en turnos
+        impares emite un aviso sonoro de proximidad.
+  - Si no es adyacente: imprime un error y no realiza movimiento.
+
+
+1.12. verificar_murcielagos(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Gestiona el secuestro y teletransporte caótico por murciélagos gigantes.
+Funcionamiento en programación:
+  - Comprueba si `self.pos_jugador in self.pos_murcielagos`.
+  - Si coincide:
+      * Selecciona aleatoriamente una habitación de destino distinta a la actual.
+      * Actualiza `self.pos_jugador = destino` y la marca como visitada.
+      * Reubica a los murciélagos en otra habitación libre para no atrapar al jugador
+        en un bucle infinito.
+      * Llama a `verificar_estado()` en la nueva habitación de destino (¡el jugador
+        podría caer sobre un pozo o el Wumpus!).
+
+
+1.13. verificar_estado(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Evalúa si el jugador ha muerto.
+Funcionamiento en programación:
+  - Comprueba si `self.pos_jugador in self.pos_pozos`. Si es así, imprime mensaje de
+    caída al vacío y establece `self.vivo = False`.
+  - Comprueba si `self.pos_jugador == self.pos_wumpus and self.wumpus_vivo`. Si es así,
+    imprime mensaje de devorado y establece `self.vivo = False`.
+
+
+1.14. lanzar_piedra(self, objetivo)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Permite al jugador explorar habitaciones contiguas mediante ecos sonoros o distraer.
+Funcionamiento en programación:
+  - Valida que `self.piedras > 0` y que `objetivo in self.grafo[self.pos_jugador]`.
+    Si la casilla no está conectada, no gasta piedras.
+  - Descuenta una piedra (`self.piedras -= 1`).
+  - Evalúa el contenido del objetivo e imprime la respuesta física:
+      * Pozo -> Sonido de caída y splash en agua profunda.
+      * Wumpus -> Gruñido furioso y llama a `mover_wumpus_aleatorio()`.
+      * Murciélagos -> Chillido agudo y aleteo.
+      * Derrumbe -> Caída de polvo y piedras del techo.
+      * Vacío -> La piedra rueda por el suelo rocoso.
+  - Si el Wumpus está cazando, reduce `self.turnos_caceria` en 1 para retrasar
+    el avance del monstruo por distracción.
+
+
+1.15. agarrar(self)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Toma el oro de la cueva e inicia la persecución activa.
+Funcionamiento en programación:
+  - Si `self.pos_jugador == self.pos_oro` y aún no tiene el oro:
+      * Cambia `self.tiene_oro = True`.
+      * Si el Wumpus sigue vivo, activa `self.modo_caceria = True` e imprime la alerta
+        de rugido sísmico.
+  - Si no está sobre el oro o ya lo tiene, informa al jugador.
+
+
+1.16. disparar(self, objetivo)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Dispara la flecha a lo largo de un pasillo en línea recta (raycasting).
+Funcionamiento en programación:
+  - Valida que `self.flechas > 0` y que no se dispare a la propia habitación.
+  - Calcula la diferencia de coordenadas `(dx, dy)`.
+  - Valida que el disparo sea ortogonal (`dx == 0` o `dy == 0`). Si es diagonal,
+    cancela el disparo y conserva la flecha.
+  - Normaliza la dirección a pasos unitarios `paso_x` y `paso_y` (-1, 0, o 1).
+  - Consume la flecha (`self.flechas -= 1`).
+  - Inicia un bucle `while` que avanza casilla por casilla en esa dirección hasta
+    llegar al borde de la cueva:
+      * Si en alguna casilla `(cur_x, cur_y) == self.pos_wumpus` y el Wumpus está vivo:
+        lo mata (`self.wumpus_vivo = False`), desactiva la cacería (`self.modo_caceria = False`)
+        y detiene el avance de la flecha con `break`.
+  - Si la flecha no acierta a nada y el Wumpus sigue vivo (y no estaba cazando),
+    el estruendo asusta al Wumpus llamando a `mover_wumpus_aleatorio()`.
+
+
+1.17. mostrar_mapa(self, revelar_todo=False)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Dibuja el grafo completo en texto ASCII: los vértices representan cuevas y las
+  líneas representan los caminos y túneles.
+Funcionamiento en programación:
+  - Itera desde `y = tamano - 1` descendiendo hasta `0` (el eje Y va de abajo hacia arriba).
+  - Dibuja la fila de vértices y aristas horizontales:
+      * Si es la casilla del jugador: dibuja `( J )` o `(J+O)`.
+      * Si está explorada: `( . )`.
+      * Si es desconocida (niebla): `( ? )`.
+      * En revelación final (`revelar_todo=True`): muestra `( W )`, `( O )`, `( P )`, etc.
+      * Conexión horizontal: si `(x + 1, y)` está en `self.grafo`, dibuja ` --- `.
+        Si la arista está en `self.bloqueos` (derrumbe), dibuja ` -x- `.
+  - Dibuja la fila intermedia de aristas verticales:
+      * Para cada x, si `(x, y - 1)` está conectado en `self.grafo`, dibuja `  |  `.
+      * Si está derrumbado, dibuja `  x  `.
+  - Al pie dibuja las etiquetas del eje X `(0, 1, 2, 3)` y la leyenda explicativa.
+
+
+
+2. FUNCIONES AUXILIARES Y ANÁLISIS DE ENTRADA
+--------------------------------------------------------------------------------
+
+2.1. parse_comando(entrada)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Procesa y estandariza las instrucciones escritas por el usuario en la terminal.
+Funcionamiento en programación:
+  - Limpia espacios en blanco en los extremos y convierte todo a minúsculas (`strip().lower()`).
+  - Utiliza una expresión regular `re.findall(r'-?\d+', texto)` para extraer cualquier
+    par de números presentes en la frase (por ejemplo, "1,0", "1 0", "(1, 0)").
+  - Separa la primera palabra como el comando principal (`partes[0]`).
+  - Asocia sinónimos:
+      * "salir", "exit", "quit", "q" -> retorna ("salir", None)
+      * "ayuda", "help", "?" -> retorna ("ayuda", None)
+      * "mapa", "ver", "m" -> retorna ("mapa", None)
+      * "agarrar", "coger", "tomar", "oro" -> retorna ("agarrar", None)
+      * "mover", "ir" -> si hay 2 números retorna ("mover", (x, y)). Si faltan,
+        retorna ("mover_invalido", None).
+      * "disparar", "flecha", "disp" -> similar para disparos.
+      * "lanzar", "piedra", "tirar" -> similar para piedras.
+  - Si el usuario escribe únicamente las coordenadas directas (ej: "1, 0"), asume
+    la acción de mover a esa casilla.
+  - Si no coincide con nada, retorna ("desconocido", texto).
+
+
+2.2. imprimir_ayuda()
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Imprime en pantalla la lista formateada de todos los comandos disponibles y ejemplos.
+
+
+
+3. BUCLE PRINCIPAL DE JUEGO (__main__)
+--------------------------------------------------------------------------------
+¿Qué hace?
+  Es el motor central de ejecución de la partida en la terminal.
+Funcionamiento en programación:
+  - Instancia un objeto `juego = MundoWumpus()`.
+  - Imprime la bienvenida y muestra el mapa inicial con niebla de guerra.
+  - Ejecuta un bucle continuo `while juego.vivo`:
+      1. Evalúa condición de victoria: Si `juego.pos_jugador == (0, 0)` y `juego.tiene_oro`,
+         imprime la felicitación, revela el mapa completo con `juego.mostrar_mapa(revelar_todo=True)`
+         y rompe el bucle con `break`.
+      2. Muestra la habitación actual, calcula y lista las percepciones con `juego.percibir()`,
+         y muestra el estado de flechas, piedras, oro y alerta de cacería.
+      3. Solicita entrada al usuario con `input()`.
+      4. Pasa la entrada a `parse_comando(entrada)`.
+      5. Ejecuta la acción correspondiente llamando al método del objeto `juego`:
+         `juego.mover()`, `juego.disparar()`, `juego.lanzar_piedra()`, etc.
+      6. Tras moverse, si el jugador sigue vivo, vuelve a dibujar el mapa actualizado.
+  - Si el bucle termina porque `juego.vivo` es `False`, imprime el mensaje de muerte
+    y llama a `juego.mostrar_mapa(revelar_todo=True)` revelando todas las criaturas y trampas.
+================================================================================

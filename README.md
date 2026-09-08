@@ -63,7 +63,12 @@ git clone https://github.com/BrunoJuarez22/wumpus.git
 # Entrar al directorio
 cd wumpus
 
-# Ejecutar el juego
+# Ejecutar con Interfaz Gráfica (GUI)
+python gui.py
+# o también:
+python wunpus.py --gui
+
+# Ejecutar en Modo Terminal (CLI)
 python wunpus.py
 ```
 

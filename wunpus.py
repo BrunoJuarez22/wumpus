@@ -3,8 +3,11 @@ import re
 from collections import deque
 
 class MundoWumpus:
-    def __init__(self, tamano=4):
+    def __init__(self, tamano=4, callback_notificar=None):
         self.tamano = tamano
+        self.callback_notificar = callback_notificar
+        self.historial_mensajes = []
+        
         self.grafo = {}
         self.construir_grafo()
         
@@ -29,6 +32,14 @@ class MundoWumpus:
         
         self.inicializar_elementos()
 
+    def notificar(self, mensaje):
+        """Registra un mensaje y lo envía al callback de la GUI o a print() en terminal."""
+        self.historial_mensajes.append(mensaje)
+        if self.callback_notificar:
+            self.callback_notificar(mensaje)
+        else:
+            print(mensaje)
+
     def construir_grafo(self):
         """Construye un grafo no dirigido representando una cuadrícula."""
         for x in range(self.tamano):
@@ -50,7 +61,7 @@ class MundoWumpus:
             actual = cola.popleft()
             if actual == destino:
                 return True
-            for vecino in self.grafo[actual]:
+            for vecino in self.grafo.get(actual, []):
                 if vecino not in self.pos_pozos and vecino not in visitados:
                     visitados.add(vecino)
                     cola.append(vecino)
@@ -76,7 +87,6 @@ class MundoWumpus:
         camino = self._obtener_camino_wumpus()
         if camino:
             return len(camino) - 1
-        # Distancia Manhattan de respaldo si no hay ruta sin pozos
         return abs(self.pos_wumpus[0] - self.pos_jugador[0]) + abs(self.pos_wumpus[1] - self.pos_jugador[1])
 
     def inicializar_elementos(self):
@@ -113,7 +123,7 @@ class MundoWumpus:
     def percibir(self):
         """Devuelve las percepciones en el nodo actual del jugador."""
         percepciones = []
-        vecinos = self.grafo[self.pos_jugador]
+        vecinos = self.grafo.get(self.pos_jugador, [])
         
         # Percibir hedor
         if self.wumpus_vivo and (self.pos_wumpus in vecinos or self.pos_jugador == self.pos_wumpus):
@@ -142,12 +152,12 @@ class MundoWumpus:
         if not self.wumpus_vivo:
             return
             
-        candidatos = [n for n in self.grafo[self.pos_wumpus] if n not in self.pos_pozos]
+        candidatos = [n for n in self.grafo.get(self.pos_wumpus, []) if n not in self.pos_pozos]
         if candidatos:
             self.pos_wumpus = random.choice(candidatos)
-            print("\n¡Escuchas pasos pesados y un bufido feroz en la penumbra! El Wumpus ha cambiado de habitación.")
+            self.notificar("\n¡Escuchas pasos pesados y un bufido feroz en la penumbra! El Wumpus ha cambiado de habitación.")
             if self.pos_wumpus == self.pos_jugador:
-                print("¡¡EL WUMPUS HA ENTRADO EN TU HABITACIÓN!!")
+                self.notificar("¡¡EL WUMPUS HA ENTRADO EN TU HABITACIÓN!!")
                 self.verificar_estado()
 
     def cazar_jugador(self):
@@ -164,14 +174,13 @@ class MundoWumpus:
             distancia_restante = len(camino) - 2
             
             if self.pos_wumpus == self.pos_jugador:
-                print("\n¡¡EL WUMPUS IRRUMPE VELOZMENTE EN TU HABITACIÓN CON LAS FAUCES ABIERTAS!!")
+                self.notificar("\n¡¡EL WUMPUS IRRUMPE VELOZMENTE EN TU HABITACIÓN CON LAS FAUCES ABIERTAS!!")
                 self.verificar_estado()
             else:
                 sufijo = "es" if distancia_restante > 1 else ""
-                print(f"\n¡¡PASOS PESADOS Y RASPADO DE GARRAS!! El Wumpus avanza hacia ti (está a {distancia_restante} habitación{sufijo} de distancia).")
+                self.notificar(f"\n¡¡PASOS PESADOS Y RASPADO DE GARRAS!! El Wumpus avanza hacia ti (está a {distancia_restante} habitación{sufijo} de distancia).")
         else:
-            # Si no encuentra camino sin pozos, intenta rodear o ruge
-            print("\n¡Escuchas un rugido frustrado a lo lejos! El Wumpus intenta buscar una ruta hacia ti.")
+            self.notificar("\n¡Escuchas un rugido frustrado a lo lejos! El Wumpus intenta buscar una ruta hacia ti.")
             self.mover_wumpus_aleatorio()
 
     def activar_derrumbe(self):
@@ -183,10 +192,10 @@ class MundoWumpus:
             return
             
         self.derrumbe_ocurrido = True
-        print("\n¡¡CRRAAAACK... BOOOM!! ¡Se produce un violento desprendimiento de rocas del techo!")
+        self.notificar("\n¡¡CRRAAAACK... BOOOM!! ¡Se produce un violento desprendimiento de rocas del techo!")
         
         pos = self.pos_jugador
-        vecinos = list(self.grafo[pos])
+        vecinos = list(self.grafo.get(pos, []))
         random.shuffle(vecinos)
         
         tunel_bloqueado = False
@@ -200,21 +209,21 @@ class MundoWumpus:
             if camino_inicio and camino_oro:
                 tunel_bloqueado = True
                 self.bloqueos.add((min(pos, v), max(pos, v)))
-                print(f"¡Rocas gigantes han sellado el paso entre {pos} y {v}! Ese túnel ya no existe.")
+                self.notificar(f"¡Rocas gigantes han sellado el paso entre {pos} y {v}! Ese túnel ya no existe.")
                 break
             else:
                 self.grafo[pos].append(v)
                 self.grafo[v].append(pos)
                 
         if not tunel_bloqueado:
-            print("¡Grandes rocas se desploman sobre el suelo rozándote! Logras esquivarlas a tiempo.")
+            self.notificar("¡Grandes rocas se desploman sobre el suelo rozándote! Logras esquivarlas a tiempo.")
 
     def mover(self, nueva_pos):
         """Mueve al jugador a un nodo adyacente usando las aristas del grafo."""
-        if nueva_pos in self.grafo[self.pos_jugador]:
+        if nueva_pos in self.grafo.get(self.pos_jugador, []):
             self.pos_jugador = nueva_pos
             self.habitaciones_visitadas.add(nueva_pos)
-            print(f"\nTe has movido a {self.pos_jugador}")
+            self.notificar(f"\nTe has movido a {self.pos_jugador}")
             
             # Comprobar desprendimiento de rocas
             if self.pos_jugador == self.pos_derrumbe and not self.derrumbe_ocurrido:
@@ -234,17 +243,17 @@ class MundoWumpus:
                 else:
                     dist = self._distancia_al_jugador()
                     sufijo = "es" if dist > 1 else ""
-                    print(f"\n¡Sientes un bufido cavernoso y el suelo vibrar! El Wumpus te acecha a {dist} habitación{sufijo}...")
+                    self.notificar(f"\n¡Sientes un bufido cavernoso y el suelo vibrar! El Wumpus te acecha a {dist} habitación{sufijo}...")
         else:
-            print(f"\n¡No hay camino hacia {nueva_pos}! Habitaciones conectadas: {self.grafo[self.pos_jugador]}")
+            self.notificar(f"\n¡No hay camino hacia {nueva_pos}! Habitaciones conectadas: {self.grafo.get(self.pos_jugador, [])}")
 
     def verificar_murcielagos(self):
         """Comprueba si el jugador entró a la habitación de los murciélagos gigantes."""
         if self.pos_jugador in self.pos_murcielagos:
-            print("\n¡¡SWOOOOSH!! ¡Una bandada de murciélagos gigantes te atrapa con sus garras y te alza en vuelo!")
+            self.notificar("\n¡¡SWOOOOSH!! ¡Una bandada de murciélagos gigantes te atrapa con sus garras y te alza en vuelo!")
             posibles = [h for h in self.grafo.keys() if h != self.pos_jugador]
             destino = random.choice(posibles)
-            print(f"¡Te dejan caer en la habitación {destino} y huyen hacia la oscuridad!")
+            self.notificar(f"¡Te dejan caer en la habitación {destino} y huyen hacia la oscuridad!")
             self.pos_jugador = destino
             self.habitaciones_visitadas.add(destino)
             
@@ -256,10 +265,10 @@ class MundoWumpus:
     def verificar_estado(self):
         """Comprueba si el jugador cayó en un pozo o fue comido por el Wumpus."""
         if self.pos_jugador in self.pos_pozos:
-            print("\n¡AAAAAAHHHH! Caíste en un pozo infinito. Fin del juego.")
+            self.notificar("\n¡AAAAAAHHHH! Caíste en un pozo infinito. Fin del juego.")
             self.vivo = False
         elif self.pos_jugador == self.pos_wumpus and self.wumpus_vivo:
-            print("\n¡CRUNCH! El Wumpus te ha devorado. Fin del juego.")
+            self.notificar("\n¡CRUNCH! El Wumpus te ha devorado. Fin del juego.")
             self.vivo = False
 
     def lanzar_piedra(self, objetivo):
@@ -268,54 +277,54 @@ class MundoWumpus:
         Si el Wumpus está en cacería, el ruido puede distraerlo temporalmente.
         """
         if self.piedras <= 0:
-            print("\nYa no te quedan piedras en la bolsa.")
+            self.notificar("\nYa no te quedan piedras en la bolsa.")
             return
 
-        if objetivo not in self.grafo[self.pos_jugador]:
-            print(f"\nSolo puedes lanzar piedras a habitaciones directamente conectadas: {self.grafo[self.pos_jugador]}")
+        if objetivo not in self.grafo.get(self.pos_jugador, []):
+            self.notificar(f"\nSolo puedes lanzar piedras a habitaciones directamente conectadas: {self.grafo.get(self.pos_jugador, [])}")
             return
 
         self.piedras -= 1
-        print(f"\n¡Lanzas una piedra hacia {objetivo}! Escuchas atentamente...")
+        self.notificar(f"\n¡Lanzas una piedra hacia {objetivo}! Escuchas atentamente...")
 
         if objetivo in self.pos_pozos:
-            print("  > ... ¡SPLASH! Escuchas el eco lejano de la piedra cayendo al abismo de un pozo.")
+            self.notificar("  > ... ¡SPLASH! Escuchas el eco lejano de la piedra cayendo al abismo de un pozo.")
         elif objetivo == self.pos_wumpus and self.wumpus_vivo:
-            print("  > ... ¡¡ROAAAR!! La piedra golpeó al Wumpus y ruge enfurecido.")
+            self.notificar("  > ... ¡¡ROAAAR!! La piedra golpeó al Wumpus y ruge enfurecido.")
             self.mover_wumpus_aleatorio()
         elif objetivo in self.pos_murcielagos:
-            print("  > ... ¡¡CHIIIRP!! Escuchas un chillido agudo y un frenético aleteo. ¡Hay murciélagos gigantes!")
+            self.notificar("  > ... ¡¡CHIIIRP!! Escuchas un chillido agudo y un frenético aleteo. ¡Hay murciélagos gigantes!")
         elif objetivo == self.pos_derrumbe and not self.derrumbe_ocurrido:
-            print("  > ... ¡CRAC! La piedra impacta el techo y cae polvo y guijarros. ¡El techo es inestable!")
+            self.notificar("  > ... ¡CRAC! La piedra impacta el techo y cae polvo y guijarros. ¡El techo es inestable!")
         else:
-            print("  > ... ¡Clac-clac! La piedra rueda por el suelo de roca sin novedad. Parece seguro.")
+            self.notificar("  > ... ¡Clac-clac! La piedra rueda por el suelo de roca sin novedad. Parece seguro.")
 
         # Distracción en cacería
         if self.modo_caceria and self.wumpus_vivo:
-            print("  > ¡El eco confunde al Wumpus por un momento, retrasando su avance!")
+            self.notificar("  > ¡El eco confunde al Wumpus por un momento, retrasando su avance!")
             self.turnos_caceria = max(0, self.turnos_caceria - 1)
 
-        print(f"Te quedan {self.piedras} piedras.")
+        self.notificar(f"Te quedan {self.piedras} piedras.")
 
     def agarrar(self):
         """Intenta agarrar el oro en la posición actual. Activa el modo cacería del Wumpus si está vivo."""
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             self.tiene_oro = True
-            print("\n¡Has agarrado el Oro!")
+            self.notificar("\n¡Has agarrado el Oro!")
             
             if self.wumpus_vivo:
                 self.modo_caceria = True
-                print("\n" + "!" * 58)
-                print(" ¡¡¡ROAAAR ENSORDECEDOR RESONANDO EN TODA LA CUEVA!!! ")
-                print(" El Wumpus ha olido el brillo del oro y ENTRA EN CACERÍA. ")
-                print(" ¡Te persigue activamente! Huye a (0, 0) antes de ser cazado. ")
-                print("!" * 58)
+                self.notificar("\n" + "!" * 58)
+                self.notificar(" ¡¡¡ROAAAR ENSORDECEDOR RESONANDO EN TODA LA CUEVA!!! ")
+                self.notificar(" El Wumpus ha olido el brillo del oro y ENTRA EN CACERÍA. ")
+                self.notificar(" ¡Te persigue activamente! Huye a (0, 0) antes de ser cazado. ")
+                self.notificar("!" * 58)
             else:
-                print("Ahora regresa a (0, 0) para escapar y ganar.")
+                self.notificar("Ahora regresa a (0, 0) para escapar y ganar.")
         elif self.tiene_oro:
-            print("\nYa tienes el oro en tu mochila.")
+            self.notificar("\nYa tienes el oro en tu mochila.")
         else:
-            print("\nNo hay nada que agarrar aquí.")
+            self.notificar("\nNo hay nada que agarrar aquí.")
 
     def disparar(self, objetivo):
         """
@@ -324,11 +333,11 @@ class MundoWumpus:
         Si mata al Wumpus, detiene la cacería.
         """
         if self.flechas <= 0:
-            print("\nYa no te quedan flechas.")
+            self.notificar("\nYa no te quedan flechas.")
             return
 
         if objetivo == self.pos_jugador:
-            print("\nNo puedes disparar a tu propia habitación.")
+            self.notificar("\nNo puedes disparar a tu propia habitación.")
             return
 
         x_orig, y_orig = self.pos_jugador
@@ -338,14 +347,14 @@ class MundoWumpus:
         dy = y_dest - y_orig
 
         if dx != 0 and dy != 0:
-            print("\nNo puedes disparar en diagonal. Dispara en línea recta (arriba, abajo, izquierda o derecha).")
+            self.notificar("\nNo puedes disparar en diagonal. Dispara en línea recta (arriba, abajo, izquierda o derecha).")
             return
 
         paso_x = 1 if dx > 0 else (-1 if dx < 0 else 0)
         paso_y = 1 if dy > 0 else (-1 if dy < 0 else 0)
 
         self.flechas -= 1
-        print(f"\n¡Disparas la flecha hacia ({paso_x:+d}, {paso_y:+d})! La flecha silba velozmente en la oscuridad...")
+        self.notificar(f"\n¡Disparas la flecha hacia ({paso_x:+d}, {paso_y:+d})! La flecha silba velozmente en la oscuridad...")
 
         cur_x, cur_y = x_orig + paso_x, y_orig + paso_y
         impacto = False
@@ -354,16 +363,16 @@ class MundoWumpus:
             if (cur_x, cur_y) == self.pos_wumpus and self.wumpus_vivo:
                 self.wumpus_vivo = False
                 impacto = True
-                print(f"¡¡¡GRITO ESCALOFRIANTE en ({cur_x}, {cur_y})!!! Has matado al Wumpus.")
+                self.notificar(f"¡¡¡GRITO ESCALOFRIANTE en ({cur_x}, {cur_y})!!! Has matado al Wumpus.")
                 if self.modo_caceria:
                     self.modo_caceria = False
-                    print("¡La cueva queda en silencio sepulcral! La cacería ha terminado, estás a salvo.")
+                    self.notificar("¡La cueva queda en silencio sepulcral! La cacería ha terminado, estás a salvo.")
                 break
             cur_x += paso_x
             cur_y += paso_y
 
         if not impacto:
-            print("¡Clac! La flecha se estrelló contra una pared lejana. No acertaste.")
+            self.notificar("¡Clac! La flecha se estrelló contra una pared lejana. No acertaste.")
             if self.wumpus_vivo and not self.modo_caceria:
                 self.mover_wumpus_aleatorio()
 
@@ -463,8 +472,8 @@ def imprimir_ayuda():
     print("----------------------------\n")
 
 
-# === BUCLE DE JUEGO ===
-if __name__ == "__main__":
+# === BUCLE DE JUEGO CLI ===
+def jugar_cli():
     juego = MundoWumpus()
     print("=========================================")
     print("   BIENVENIDO AL MUNDO DEL WUMPUS (v3)   ")
@@ -493,7 +502,7 @@ if __name__ == "__main__":
         else:
             print("  > No percibes nada inusual.")
             
-        print(f"  > Habitaciones conectadas: {juego.grafo[juego.pos_jugador]}")
+        print(f"  > Habitaciones conectadas: {juego.grafo.get(juego.pos_jugador, [])}")
         estado_caceria = " | [¡¡ALERTA: WUMPUS EN CACERÍA!!]" if juego.modo_caceria and juego.wumpus_vivo else ""
         print(f"  > Flechas: {juego.flechas} | Piedras: {juego.piedras} | Oro: {'Sí' if juego.tiene_oro else 'No'}{estado_caceria}")
         
@@ -533,3 +542,12 @@ if __name__ == "__main__":
     if not juego.vivo:
         print("\nHas muerto en la oscuridad de la cueva.")
         juego.mostrar_mapa(revelar_todo=True)
+
+
+if __name__ == "__main__":
+    import sys
+    if "--gui" in sys.argv:
+        from gui import iniciar_gui
+        iniciar_gui()
+    else:
+        jugar_cli()

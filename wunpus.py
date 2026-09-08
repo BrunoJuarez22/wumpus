@@ -8,7 +8,6 @@ class MundoWumpus:
         self.grafo = {}
         self.construir_grafo()
         
-        # Posiciones de los elementos
         self.pos_jugador = (0, 0)
         self.pos_wumpus = None
         self.pos_oro = None
@@ -30,20 +29,16 @@ class MundoWumpus:
         self.inicializar_elementos()
 
     def construir_grafo(self):
-        """Construye un grafo no dirigido representando una cuadrícula."""
         for x in range(self.tamano):
             for y in range(self.tamano):
                 vecinos = []
-                # Conectar con las habitaciones adyacentes (Aristas no dirigidas)
-                if x > 0: vecinos.append((x - 1, y)) # Izquierda
-                if x < self.tamano - 1: vecinos.append((x + 1, y)) # Derecha
-                if y > 0: vecinos.append((x, y - 1)) # Abajo
-                if y < self.tamano - 1: vecinos.append((x, y + 1)) # Arriba
-                
+                if x > 0: vecinos.append((x - 1, y))
+                if x < self.tamano - 1: vecinos.append((x + 1, y))
+                if y > 0: vecinos.append((x, y - 1))
+                if y < self.tamano - 1: vecinos.append((x, y + 1))
                 self.grafo[(x, y)] = vecinos
 
     def _existe_camino_seguro(self, inicio, destino):
-        """Verifica mediante BFS si existe un camino desde inicio hasta destino sin pisar pozos."""
         cola = deque([inicio])
         visitados = {inicio}
         while cola:
@@ -57,7 +52,6 @@ class MundoWumpus:
         return False
 
     def _obtener_camino_wumpus(self):
-        """Calcula el camino más corto del Wumpus al jugador evitando pozos mediante BFS."""
         cola = deque([[self.pos_wumpus]])
         visitados = {self.pos_wumpus}
         while cola:
@@ -72,21 +66,15 @@ class MundoWumpus:
         return None
 
     def _distancia_al_jugador(self):
-        """Devuelve la distancia en pasos de grafo del Wumpus al jugador."""
         camino = self._obtener_camino_wumpus()
         if camino:
             return len(camino) - 1
-        # Distancia Manhattan de respaldo si no hay ruta sin pozos
         return abs(self.pos_wumpus[0] - self.pos_jugador[0]) + abs(self.pos_wumpus[1] - self.pos_jugador[1])
 
     def inicializar_elementos(self):
-        """
-        Coloca el Wumpus, el oro, los pozos, los murciélagos y la zona de derrumbe.
-        Garantiza mediante BFS que el mapa sea siempre solucionable (existe camino sin pozos hacia el oro).
-        """
         while True:
             habitaciones = list(self.grafo.keys())
-            habitaciones.remove((0, 0)) # El inicio siempre es seguro
+            habitaciones.remove((0, 0))
             
             self.pos_wumpus = random.choice(habitaciones)
             habitaciones.remove(self.pos_wumpus)
@@ -94,51 +82,40 @@ class MundoWumpus:
             self.pos_oro = random.choice(habitaciones)
             habitaciones.remove(self.pos_oro)
             
-            # Murciélagos gigantes (1 habitación)
             pos_bat = random.choice(habitaciones)
             self.pos_murcielagos = [pos_bat]
             habitaciones.remove(pos_bat)
             
-            # Zona inestable propensa a desprendimiento de rocas (1 habitación)
             self.pos_derrumbe = random.choice(habitaciones)
             habitaciones.remove(self.pos_derrumbe)
             
-            # Colocar pozos con 20% de probabilidad en habitaciones restantes
             self.pos_pozos = [hab for hab in habitaciones if random.random() < 0.2]
             
-            # Validar que exista al menos un camino seguro hasta el oro
             if self._existe_camino_seguro((0, 0), self.pos_oro):
                 break
 
     def percibir(self):
-        """Devuelve las percepciones en el nodo actual del jugador."""
         percepciones = []
         vecinos = self.grafo[self.pos_jugador]
         
-        # Percibir hedor
         if self.wumpus_vivo and (self.pos_wumpus in vecinos or self.pos_jugador == self.pos_wumpus):
             percepciones.append("Hedor")
             
-        # Percibir brisa
         if any(pozo in vecinos for pozo in self.pos_pozos):
             percepciones.append("Brisa")
             
-        # Percibir aleteo (murciélagos gigantes)
         if any(bat in vecinos for bat in self.pos_murcielagos):
             percepciones.append("Aleteo")
             
-        # Percibir crujido (zona inestable / rocas sueltas)
         if self.pos_derrumbe in vecinos and not self.derrumbe_ocurrido:
             percepciones.append("Crujido")
             
-        # Percibir brillo
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             percepciones.append("Brillo")
             
         return percepciones
 
     def mover_wumpus_aleatorio(self):
-        """Desplaza al Wumpus a una habitación adyacente libre de pozos."""
         if not self.wumpus_vivo:
             return
             
@@ -151,9 +128,6 @@ class MundoWumpus:
                 self.verificar_estado()
 
     def cazar_jugador(self):
-        """
-        En modo cacería, el Wumpus calcula la ruta más corta hacia el jugador y avanza un paso.
-        """
         if not self.wumpus_vivo or not self.modo_caceria:
             return
 
@@ -170,15 +144,10 @@ class MundoWumpus:
                 sufijo = "es" if distancia_restante > 1 else ""
                 print(f"\n¡¡PASOS PESADOS Y RASPADO DE GARRAS!! El Wumpus avanza hacia ti (está a {distancia_restante} habitación{sufijo} de distancia).")
         else:
-            # Si no encuentra camino sin pozos, intenta rodear o ruge
             print("\n¡Escuchas un rugido frustrado a lo lejos! El Wumpus intenta buscar una ruta hacia ti.")
             self.mover_wumpus_aleatorio()
 
     def activar_derrumbe(self):
-        """
-        Provoca un desprendimiento de rocas en la habitación inestable.
-        Bloquea un túnel adyacente eliminando la arista del grafo sin romper la solubilidad.
-        """
         if self.derrumbe_ocurrido:
             return
             
@@ -210,23 +179,19 @@ class MundoWumpus:
             print("¡Grandes rocas se desploman sobre el suelo rozándote! Logras esquivarlas a tiempo.")
 
     def mover(self, nueva_pos):
-        """Mueve al jugador a un nodo adyacente usando las aristas del grafo."""
         if nueva_pos in self.grafo[self.pos_jugador]:
             self.pos_jugador = nueva_pos
             self.habitaciones_visitadas.add(nueva_pos)
             print(f"\nTe has movido a {self.pos_jugador}")
             
-            # Comprobar desprendimiento de rocas
             if self.pos_jugador == self.pos_derrumbe and not self.derrumbe_ocurrido:
                 self.activar_derrumbe()
                 
             self.verificar_estado()
             
-            # Comprobar murciélagos gigantes si sigue vivo
             if self.vivo:
                 self.verificar_murcielagos()
                 
-            # Avance de la cacería del Wumpus si el jugador sigue con vida
             if self.vivo and self.modo_caceria and self.wumpus_vivo:
                 self.turnos_caceria += 1
                 if self.turnos_caceria % 2 == 0:
@@ -239,7 +204,6 @@ class MundoWumpus:
             print(f"\n¡No hay camino hacia {nueva_pos}! Habitaciones conectadas: {self.grafo[self.pos_jugador]}")
 
     def verificar_murcielagos(self):
-        """Comprueba si el jugador entró a la habitación de los murciélagos gigantes."""
         if self.pos_jugador in self.pos_murcielagos:
             print("\n¡¡SWOOOOSH!! ¡Una bandada de murciélagos gigantes te atrapa con sus garras y te alza en vuelo!")
             posibles = [h for h in self.grafo.keys() if h != self.pos_jugador]
@@ -254,7 +218,6 @@ class MundoWumpus:
             self.verificar_estado()
 
     def verificar_estado(self):
-        """Comprueba si el jugador cayó en un pozo o fue comido por el Wumpus."""
         if self.pos_jugador in self.pos_pozos:
             print("\n¡AAAAAAHHHH! Caíste en un pozo infinito. Fin del juego.")
             self.vivo = False
@@ -263,10 +226,6 @@ class MundoWumpus:
             self.vivo = False
 
     def lanzar_piedra(self, objetivo):
-        """
-        Lanza una piedra hacia una habitación adyacente para tantear su contenido.
-        Si el Wumpus está en cacería, el ruido puede distraerlo temporalmente.
-        """
         if self.piedras <= 0:
             print("\nYa no te quedan piedras en la bolsa.")
             return
@@ -290,7 +249,6 @@ class MundoWumpus:
         else:
             print("  > ... ¡Clac-clac! La piedra rueda por el suelo de roca sin novedad. Parece seguro.")
 
-        # Distracción en cacería
         if self.modo_caceria and self.wumpus_vivo:
             print("  > ¡El eco confunde al Wumpus por un momento, retrasando su avance!")
             self.turnos_caceria = max(0, self.turnos_caceria - 1)
@@ -298,7 +256,6 @@ class MundoWumpus:
         print(f"Te quedan {self.piedras} piedras.")
 
     def agarrar(self):
-        """Intenta agarrar el oro en la posición actual. Activa el modo cacería del Wumpus si está vivo."""
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             self.tiene_oro = True
             print("\n¡Has agarrado el Oro!")
@@ -318,11 +275,6 @@ class MundoWumpus:
             print("\nNo hay nada que agarrar aquí.")
 
     def disparar(self, objetivo):
-        """
-        Dispara una flecha en línea recta hacia la dirección del objetivo.
-        No descuenta la flecha si la dirección es inválida.
-        Si mata al Wumpus, detiene la cacería.
-        """
         if self.flechas <= 0:
             print("\nYa no te quedan flechas.")
             return
@@ -368,13 +320,11 @@ class MundoWumpus:
                 self.mover_wumpus_aleatorio()
 
     def mostrar_mapa(self, revelar_todo=False):
-        """Muestra el grafo de la cueva en consola: los vértices son las cuevas y las líneas son los caminos."""
         titulo = "--- MAPA DEL GRAFO DE LA CUEVA (REVELADO) ---" if revelar_todo else "--- MAPA DEL GRAFO EXPLORADO ---"
         print(f"\n{titulo}")
         print("   y")
         
         for y in range(self.tamano - 1, -1, -1):
-            # Línea de vértices (cuevas) y aristas horizontales
             fila_nodos = f"   {y}  "
             for x in range(self.tamano):
                 pos = (x, y)
@@ -401,19 +351,17 @@ class MundoWumpus:
                 
                 fila_nodos += nodo
                 
-                # Arista horizontal hacia el este (x + 1, y)
                 if x < self.tamano - 1:
                     vecino_este = (x + 1, y)
                     arista = (min(pos, vecino_este), max(pos, vecino_este))
                     if vecino_este in self.grafo.get(pos, []):
                         fila_nodos += " --- "
                     elif arista in self.bloqueos:
-                        fila_nodos += " -x- "  # Túnel bloqueado por derrumbe
+                        fila_nodos += " -x- "
                     else:
-                        fila_nodos += "     "  # Sin conexión
+                        fila_nodos += "     "
             print(fila_nodos)
             
-            # Línea de aristas verticales hacia el sur (x, y - 1)
             if y > 0:
                 fila_vert = "      "
                 for x in range(self.tamano):
@@ -423,15 +371,14 @@ class MundoWumpus:
                     if vecino_sur in self.grafo.get(pos, []):
                         fila_vert += "  |  "
                     elif arista in self.bloqueos:
-                        fila_vert += "  x  "  # Túnel bloqueado por derrumbe
+                        fila_vert += "  x  "
                     else:
-                        fila_vert += "     "  # Sin conexión
+                        fila_vert += "     "
                     
                     if x < self.tamano - 1:
                         fila_vert += "     "
                 print(fila_vert)
                 
-        # Eje X inferior
         print("      " + "     ".join([f"  {x}  " for x in range(self.tamano)]) + "  x")
         
         if not revelar_todo:
@@ -445,7 +392,6 @@ class MundoWumpus:
 
 
 def parse_comando(entrada):
-    """Interpreta la entrada del usuario de manera flexible y tolerante a espacios y comas."""
     texto = entrada.strip().lower()
     if not texto:
         return None, None
@@ -478,7 +424,6 @@ def parse_comando(entrada):
             return "lanzar", (int(numeros[0]), int(numeros[1]))
         return "lanzar_invalido", None
 
-    # Si el usuario solo escribió las coordenadas directamente (ej: '1,0' o '1 0')
     if len(numeros) == 2 and len(partes) <= 2:
         return "mover", (int(numeros[0]), int(numeros[1]))
 
@@ -486,7 +431,6 @@ def parse_comando(entrada):
 
 
 def imprimir_ayuda():
-    """Muestra la lista de comandos disponibles."""
     print("\n--- COMANDOS DISPONIBLES ---")
     print("  mover X,Y    (o 'X,Y')      : Desplazarte a una habitación adyacente.")
     print("  disparar X,Y (o 'flecha X Y): Disparar la flecha en línea recta hacia esa dirección.")
@@ -498,7 +442,6 @@ def imprimir_ayuda():
     print("----------------------------\n")
 
 
-# === BUCLE DE JUEGO ===
 if __name__ == "__main__":
     juego = MundoWumpus()
     print("=========================================")
@@ -511,7 +454,6 @@ if __name__ == "__main__":
     juego.mostrar_mapa()
 
     while juego.vivo:
-        # Comprobar victoria al inicio del turno en (0,0) con el oro
         if juego.pos_jugador == (0, 0) and juego.tiene_oro:
             print("\n*********************************************************")
             print(" ¡¡¡FELICIDADES!!! Has escapado de la cueva con el oro. ")

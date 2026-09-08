@@ -368,45 +368,80 @@ class MundoWumpus:
                 self.mover_wumpus_aleatorio()
 
     def mostrar_mapa(self, revelar_todo=False):
-        """Muestra una representación gráfica en consola del mundo 4x4."""
-        titulo = "--- MAPA DE LA CUEVA (REVELADO) ---" if revelar_todo else "--- MAPA EXPLORADO ---"
+        """Muestra el grafo de la cueva en consola: los vértices son las cuevas y las líneas son los caminos."""
+        titulo = "--- MAPA DEL GRAFO DE LA CUEVA (REVELADO) ---" if revelar_todo else "--- MAPA DEL GRAFO EXPLORADO ---"
         print(f"\n{titulo}")
-        print("   " + " ".join([f"  {x}  " for x in range(self.tamano)]))
-        print("  +" + "------+" * self.tamano)
+        print("   y")
         
         for y in range(self.tamano - 1, -1, -1):
-            fila_str = f"{y} |"
+            # Línea de vértices (cuevas) y aristas horizontales
+            fila_nodos = f"   {y}  "
             for x in range(self.tamano):
                 pos = (x, y)
                 if pos == self.pos_jugador:
-                    celda = "J+O" if self.tiene_oro else " J "
+                    nodo = "(J+O)" if self.tiene_oro else "( J )"
                 elif revelar_todo:
                     if pos == self.pos_wumpus:
-                        celda = " W " if self.wumpus_vivo else "MW "
+                        nodo = "( W )" if self.wumpus_vivo else "(MW )"
                     elif pos == self.pos_oro:
-                        celda = " O "
+                        nodo = "( O )"
                     elif pos in self.pos_pozos:
-                        celda = " P "
+                        nodo = "( P )"
                     elif pos in self.pos_murcielagos:
-                        celda = " M "
+                        nodo = "( M )"
                     elif pos == self.pos_derrumbe:
-                        celda = " R "
+                        nodo = "( R )"
                     else:
-                        celda = " . "
+                        nodo = "( . )"
                 else:
                     if pos in self.habitaciones_visitadas:
-                        celda = " . "
+                        nodo = "( . )"
                     else:
-                        celda = " ? "
-                fila_str += f" {celda} |"
-            print(fila_str)
-            print("  +" + "------+" * self.tamano)
+                        nodo = "( ? )"
+                
+                fila_nodos += nodo
+                
+                # Arista horizontal hacia el este (x + 1, y)
+                if x < self.tamano - 1:
+                    vecino_este = (x + 1, y)
+                    arista = (min(pos, vecino_este), max(pos, vecino_este))
+                    if vecino_este in self.grafo.get(pos, []):
+                        fila_nodos += " --- "
+                    elif arista in self.bloqueos:
+                        fila_nodos += " -x- "  # Túnel bloqueado por derrumbe
+                    else:
+                        fila_nodos += "     "  # Sin conexión
+            print(fila_nodos)
             
+            # Línea de aristas verticales hacia el sur (x, y - 1)
+            if y > 0:
+                fila_vert = "      "
+                for x in range(self.tamano):
+                    pos = (x, y)
+                    vecino_sur = (x, y - 1)
+                    arista = (min(pos, vecino_sur), max(pos, vecino_sur))
+                    if vecino_sur in self.grafo.get(pos, []):
+                        fila_vert += "  |  "
+                    elif arista in self.bloqueos:
+                        fila_vert += "  x  "  # Túnel bloqueado por derrumbe
+                    else:
+                        fila_vert += "     "  # Sin conexión
+                    
+                    if x < self.tamano - 1:
+                        fila_vert += "     "
+                print(fila_vert)
+                
+        # Eje X inferior
+        print("      " + "     ".join([f"  {x}  " for x in range(self.tamano)]) + "  x")
+        
         if not revelar_todo:
-            leyenda = "Leyenda: [J]=Jugador, [J+O]=Jugador con Oro, [.]=Visitada, [?]=Desconocida"
+            leyenda_v = "Vertices (Cuevas): (J)=Jugador, (J+O)=Jugador con Oro, (.)=Visitada, (?)=Desconocida"
+            leyenda_a = "Aristas (Caminos): (--- / |)=Tunel abierto, (-x- / x)=Tunel bloqueado por derrumbe"
         else:
-            leyenda = "Leyenda: [J]=Jugador, [W]=Wumpus Vivo, [MW]=Wumpus Muerto, [O]=Oro, [P]=Pozo, [M]=Murcielagos, [R]=Rocas/Derrumbe, [.]=Vacio"
-        print(f"  {leyenda}\n")
+            leyenda_v = "Vertices: (J)=Jugador, (W)=Wumpus Vivo, (MW)=Wumpus Muerto, (O)=Oro, (P)=Pozo, (M)=Murcielagos, (R)=Derrumbe, (.)=Vacio"
+            leyenda_a = "Aristas: (--- / |)=Tunel abierto, (-x- / x)=Tunel bloqueado por derrumbe"
+        print(f"  {leyenda_v}")
+        print(f"  {leyenda_a}\n")
 
 
 def parse_comando(entrada):

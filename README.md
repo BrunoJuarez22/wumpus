@@ -58,7 +58,7 @@ No se requieren librerías externas; utiliza únicamente la biblioteca estándar
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/tu-usuario/wumpus.git
+git clone https://github.com/BrunoJuarez22/wumpus.git
 
 # Entrar al directorio
 cd wumpus
@@ -71,3 +71,4 @@ python wunpus.py
 
 ## 👤 Autor
 Desarrollado con pasión por los juegos clásicos de IA y la teoría de grafos.
+

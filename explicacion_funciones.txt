@@ -342,3 +342,4 @@ Funcionamiento en programación:
   - Si el bucle termina porque `juego.vivo` es `False`, imprime el mensaje de muerte
     y llama a `juego.mostrar_mapa(revelar_todo=True)` revelando todas las criaturas y trampas.
 ================================================================================
+

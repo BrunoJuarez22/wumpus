@@ -792,16 +792,9 @@ def imprimir_ayuda():
     print("----------------------------\n")
 
 
-def imprimir_guia_comandos():
+def imprimir_recordatorio_ayuda():
     print("-" * 64)
-    print("Comandos disponibles:")
-    print("  * Moverse   : 'mover <N>' o simplemente el número de cueva (ej: '2')")
-    print("  * Disparar  : 'disparar <N>' o 'f <N>' (ej: 'f 2')")
-    print("  * Lanzar    : 'lanzar <N>' o 'p <N>' (tantea con una piedra)")
-    print("  * Cebo      : 'cebo <N>' o 'c <N>' (distrae al Wumpus 2 turnos)")
-    print("  * Tomar     : 'tomar' o 't' (recoge el oro o la brújula en tu cueva)")
-    print("  * Brújula   : 'brujula' o 'b' (orientación magnética al objetivo)")
-    print("  * Ayuda     : 'ayuda' o '?' | 'mapa' | 'novedades' | 'salir' (o 'q')")
+    print("Escribe 'ayuda' (o '?') para consultar la lista de comandos disponibles.")
     print("=" * 64)
 
 
@@ -868,7 +861,7 @@ def ejecutar_juego():
         else:
             prompt_texto = "\n¿Qué deseas hacer?: "
 
-        imprimir_guia_comandos()
+        imprimir_recordatorio_ayuda()
         entrada = input(prompt_texto)
         accion, args = parse_comando(entrada)
 
@@ -915,7 +908,7 @@ def ejecutar_juego():
             juego.imprimir_resumen_puntuacion()
             break
         else:
-            juego.notificar(f"[!] Comando '{args}' no reconocido. Revisa la guía de comandos abajo.")
+            juego.notificar(f"[!] Comando '{args}' no reconocido. Escribe 'ayuda' para consultar los comandos disponibles.")
 
 
 if __name__ == "__main__":

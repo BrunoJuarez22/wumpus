@@ -16,17 +16,19 @@ COLOR_CYAN = (137, 220, 235)
 COLOR_PURPLE = (203, 166, 247)
 COLOR_ORANGE = (250, 179, 135)
 
+COLOR_FACE = (26, 28, 44)
+COLOR_FACE_BORDER = (40, 44, 68)
 COLOR_TUNNEL = (48, 52, 76)
-COLOR_TUNNEL_ACTIVE = (72, 78, 115)
+COLOR_TUNNEL_ACTIVE = (78, 86, 126)
 COLOR_TUNNEL_BLOCKED = (180, 70, 90)
 
 COLOR_NODE_FOG = (22, 24, 38)
-COLOR_NODE_FOG_BORDER = (38, 42, 62)
+COLOR_NODE_FOG_BORDER = (40, 44, 64)
 COLOR_NODE_VISITED = (36, 40, 62)
 COLOR_NODE_VISITED_BORDER = (75, 82, 120)
 COLOR_NODE_PLAYER = (32, 70, 115)
 COLOR_NODE_PLAYER_BORDER = (137, 180, 250)
-COLOR_NODE_NEIGHBOR = (50, 60, 90)
+COLOR_NODE_NEIGHBOR = (48, 56, 86)
 COLOR_NODE_NEIGHBOR_BORDER = (137, 220, 235)
 
 SIGNIFICADO_PERCEPCIONES = {
@@ -39,13 +41,115 @@ SIGNIFICADO_PERCEPCIONES = {
 }
 
 
-class MundoWumpusCuadricula:
-    def __init__(self, tamano=5, callback_log=None):
-        self.tamano = tamano
-        self.total_cuevas = tamano * tamano
+def generar_geometria_mosaico(cx=335, cy=380, S=122):
+    d = S * 0.28
+    corners = {}
+    for r in range(4):
+        for c in range(4):
+            corners[(c, r)] = (int(cx + (c - 1.5) * S), int(cy + (r - 1.5) * S))
+
+    inner = {}
+    for r in range(3):
+        for c in range(3):
+            mid_x = cx + (c - 1) * S
+            mid_y = cy + (r - 1) * S
+            if (c + r) % 2 == 0:
+                v1 = (int(mid_x - d), int(mid_y))
+                v2 = (int(mid_x + d), int(mid_y))
+                inner[(c, r)] = (v1, v2, "H")
+            else:
+                v1 = (int(mid_x), int(mid_y - d))
+                v2 = (int(mid_x), int(mid_y + d))
+                inner[(c, r)] = (v1, v2, "V")
+
+    raw_edges = set()
+    for r in range(3):
+        for c in range(3):
+            v1, v2, orient = inner[(c, r)]
+            raw_edges.add((min(v1, v2), max(v1, v2)))
+            cTL = corners[(c, r)]
+            cTR = corners[(c + 1, r)]
+            cBL = corners[(c, r + 1)]
+            cBR = corners[(c + 1, r + 1)]
+            if orient == "H":
+                raw_edges.add((min(v1, cTL), max(v1, cTL)))
+                raw_edges.add((min(v1, cBL), max(v1, cBL)))
+                raw_edges.add((min(v2, cTR), max(v2, cTR)))
+                raw_edges.add((min(v2, cBR), max(v2, cBR)))
+            else:
+                raw_edges.add((min(v1, cTL), max(v1, cTL)))
+                raw_edges.add((min(v1, cTR), max(v1, cTR)))
+                raw_edges.add((min(v2, cBL), max(v2, cBL)))
+                raw_edges.add((min(v2, cBR), max(v2, cBR)))
+
+    adj = {}
+    for u, v in raw_edges:
+        adj.setdefault(u, set()).add(v)
+        adj.setdefault(v, set()).add(u)
+
+    pentagons = set()
+    for v0 in adj:
+        for v1 in adj[v0]:
+            for v2 in adj[v1]:
+                if v2 == v0: continue
+                for v3 in adj[v2]:
+                    if v3 in (v0, v1): continue
+                    for v4 in adj[v3]:
+                        if v4 in (v0, v1, v2): continue
+                        if v0 in adj[v4]:
+                            cycle = [v0, v1, v2, v3, v4]
+                            min_idx = cycle.index(min(cycle))
+                            c1 = cycle[min_idx:] + cycle[:min_idx]
+                            rev = cycle[::-1]
+                            min_idx_r = rev.index(min(rev))
+                            c2 = rev[min_idx_r:] + rev[:min_idx_r]
+                            pentagons.add(tuple(min(c1, c2)))
+
+    chordless_pents = []
+    for p in pentagons:
+        has_chord = False
+        for i in range(5):
+            for j in range(i + 2, 5):
+                if i == 0 and j == 4: continue
+                if p[j] in adj.get(p[i], set()):
+                    has_chord = True
+                    break
+            if has_chord: break
+        if not has_chord:
+            chordless_pents.append(p)
+
+    face_vertices = set()
+    face_edges = set()
+    for p in chordless_pents:
+        for i in range(5):
+            face_vertices.add(p[i])
+            face_edges.add((min(p[i], p[(i + 1) % 5]), max(p[i], p[(i + 1) % 5])))
+
+    verts_sorted = sorted(list(face_vertices), key=lambda p: (p[1], p[0]))
+    pt_to_id = {p: i + 1 for i, p in enumerate(verts_sorted)}
+    coords = {i + 1: p for i, p in enumerate(verts_sorted)}
+
+    grafo = {i + 1: [] for i in range(len(verts_sorted))}
+    for p1, p2 in face_edges:
+        id1, id2 = pt_to_id[p1], pt_to_id[p2]
+        grafo[id1].append(id2)
+        grafo[id2].append(id1)
+
+    for cid in grafo:
+        grafo[cid].sort()
+
+    caras = []
+    for p in chordless_pents:
+        caras.append([pt_to_id[v] for v in p])
+
+    return coords, grafo, caras
+
+
+class MundoWumpusMosaico:
+    def __init__(self, callback_log=None):
         self.callback_log = callback_log
-        self.grafo = {}
-        self.construir_grafo()
+        self.coords, self.grafo, self.caras = generar_geometria_mosaico()
+        self.total_cuevas = len(self.coords)
         
         self.pos_jugador = 1
         self.pos_wumpus = None
@@ -80,23 +184,6 @@ class MundoWumpusCuadricula:
     def notificar(self, mensaje, tipo="normal"):
         if self.callback_log:
             self.callback_log(mensaje, tipo)
-
-    def _cueva_a_xy(self, c):
-        return (c - 1) % self.tamano, (c - 1) // self.tamano
-
-    def _xy_a_cueva(self, x, y):
-        return y * self.tamano + x + 1
-
-    def construir_grafo(self):
-        self.grafo.clear()
-        for c in range(1, self.total_cuevas + 1):
-            x, y = self._cueva_a_xy(c)
-            vecinos = []
-            if x > 0: vecinos.append(self._xy_a_cueva(x - 1, y))
-            if x < self.tamano - 1: vecinos.append(self._xy_a_cueva(x + 1, y))
-            if y > 0: vecinos.append(self._xy_a_cueva(x, y - 1))
-            if y < self.tamano - 1: vecinos.append(self._xy_a_cueva(x, y + 1))
-            self.grafo[c] = sorted(vecinos)
 
     def _existe_camino_seguro(self, inicio, destino):
         cola = deque([inicio])
@@ -143,9 +230,9 @@ class MundoWumpusCuadricula:
         camino = self._obtener_camino_wumpus()
         if camino:
             return len(camino) - 1
-        x1, y1 = self._cueva_a_xy(self.pos_wumpus)
-        x2, y2 = self._cueva_a_xy(self.pos_jugador)
-        return abs(x1 - x2) + abs(y1 - y2)
+        p1 = self.coords[self.pos_wumpus]
+        p2 = self.coords[self.pos_jugador]
+        return max(1, int(math.hypot(p1[0] - p2[0], p1[1] - p2[1]) / 100))
 
     def inicializar_elementos(self):
         while True:
@@ -157,9 +244,8 @@ class MundoWumpusCuadricula:
             self.pos_oro = random.choice(cuevas)
             cuevas.remove(self.pos_oro)
             
-            num_bats = 2 if self.total_cuevas >= 25 else 1
             self.pos_murcielagos = []
-            for _ in range(num_bats):
+            for _ in range(2):
                 bat = random.choice(cuevas)
                 self.pos_murcielagos.append(bat)
                 cuevas.remove(bat)
@@ -381,24 +467,24 @@ class MundoWumpusCuadricula:
         if self.pos_jugador == obj_cueva:
             return f"La aguja gira sobre sí misma: ¡{nombre_meta} está aquí!"
         else:
-            xj, yj = self._cueva_a_xy(self.pos_jugador)
-            xo, yo = self._cueva_a_xy(obj_cueva)
-            dy = yo - yj
+            xj, yj = self.coords[self.pos_jugador]
+            xo, yo = self.coords[obj_cueva]
+            dy = -(yo - yj)
             dx = xo - xj
 
-            if dy > 0 and dx > 0:
+            if dy > 30 and dx > 30:
                 rumbo = "Noreste"
-            elif dy > 0 and dx < 0:
+            elif dy > 30 and dx < -30:
                 rumbo = "Noroeste"
-            elif dy < 0 and dx > 0:
+            elif dy < -30 and dx > 30:
                 rumbo = "Sureste"
-            elif dy < 0 and dx < 0:
+            elif dy < -30 and dx < -30:
                 rumbo = "Suroeste"
-            elif dy > 0:
+            elif dy > 30:
                 rumbo = "Norte"
-            elif dy < 0:
+            elif dy < -30:
                 rumbo = "Sur"
-            elif dx > 0:
+            elif dx > 30:
                 rumbo = "Este"
             else:
                 rumbo = "Oeste"
@@ -436,6 +522,39 @@ class MundoWumpusCuadricula:
     def agarrar(self):
         return self.tomar()
 
+    def trazar_flecha(self, origen, objetivo):
+        camino = [objetivo]
+        p_orig = self.coords[origen]
+        p_cur = self.coords[objetivo]
+        dx = p_cur[0] - p_orig[0]
+        dy = p_cur[1] - p_orig[1]
+        mag = math.hypot(dx, dy)
+        if mag == 0: return camino
+        dir_x, dir_y = dx / mag, dy / mag
+        
+        prev = origen
+        actual = objetivo
+        for _ in range(3):
+            candidatos = [v for v in self.grafo.get(actual, []) if v != prev]
+            mejor_v = None
+            mejor_cos = 0.4
+            for v in candidatos:
+                pv = self.coords[v]
+                vx, vy = pv[0] - self.coords[actual][0], pv[1] - self.coords[actual][1]
+                vmag = math.hypot(vx, vy)
+                if vmag == 0: continue
+                cos_th = (dir_x * vx + dir_y * vy) / vmag
+                if cos_th > mejor_cos:
+                    mejor_cos = cos_th
+                    mejor_v = v
+            if mejor_v is not None:
+                camino.append(mejor_v)
+                prev = actual
+                actual = mejor_v
+            else:
+                break
+        return camino
+
     def disparar(self, objetivo):
         if self.flechas <= 0:
             self.notificar("Ya no te quedan flechas.", "error")
@@ -446,23 +565,13 @@ class MundoWumpusCuadricula:
             self.notificar(f"Solo puedes disparar a través de un túnel conectado.", "error")
             return False
 
-        x_orig, y_orig = self._cueva_a_xy(self.pos_jugador)
-        x_dest, y_dest = self._cueva_a_xy(objetivo)
-
-        dx = x_dest - x_orig
-        dy = y_dest - y_orig
-
-        paso_x = 1 if dx > 0 else (-1 if dx < 0 else 0)
-        paso_y = 1 if dy > 0 else (-1 if dy < 0 else 0)
-
         self.flechas -= 1
         self.notificar(f"Disparas la flecha hacia la Cueva {objetivo}.", "normal")
 
-        cur_x, cur_y = x_orig + paso_x, y_orig + paso_y
+        camino = self.trazar_flecha(self.pos_jugador, objetivo)
         impacto = False
 
-        while 0 <= cur_x < self.tamano and 0 <= cur_y < self.tamano:
-            cur_cueva = self._xy_a_cueva(cur_x, cur_y)
+        for cur_cueva in camino:
             if cur_cueva == self.pos_wumpus and self.wumpus_vivo:
                 self.wumpus_vivo = False
                 impacto = True
@@ -471,11 +580,9 @@ class MundoWumpusCuadricula:
                     self.modo_caceria = False
                     self.notificar("La cueva queda en silencio. La cacería ha terminado.", "victoria")
                 break
-            cur_x += paso_x
-            cur_y += paso_y
 
         if not impacto:
-            self.notificar("La flecha chocó contra la pared. Has fallado.", "peligro")
+            self.notificar("La flecha chocó contra la pared de roca. Has fallado.", "peligro")
             if self.wumpus_vivo and not self.modo_caceria:
                 self.mover_wumpus_aleatorio()
 
@@ -552,7 +659,7 @@ class WumpusPygameApp:
         self.width = 1140
         self.height = 760
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption("El Mundo del Wumpus - Cuadrícula de 25 Cuevas")
+        pygame.display.set_caption("El Mundo del Wumpus - Mosaico de Pentágonos")
 
         self.clock = pygame.time.Clock()
         self.running = True
@@ -566,8 +673,7 @@ class WumpusPygameApp:
         self.log_mensajes = []
         self.modo_accion = "mover"
         self.juego = None
-        self.coords_cuevas = {}
-        self.radio_cueva = 24
+        self.radio_cueva = 17
 
         self.mostrar_menu_mecanicas = False
         self.btn_mecanicas_rect = None
@@ -581,7 +687,6 @@ class WumpusPygameApp:
         self.btn_tomar_rect = None
         self.btn_reiniciar_rect = None
 
-        self._calcular_coordenadas_cuadricula()
         self.nueva_partida()
 
     def agregar_log(self, mensaje, tipo="normal"):
@@ -591,26 +696,13 @@ class WumpusPygameApp:
 
     def nueva_partida(self):
         self.log_mensajes.clear()
-        self.juego = MundoWumpusCuadricula(tamano=5, callback_log=self.agregar_log)
+        self.juego = MundoWumpusMosaico(callback_log=self.agregar_log)
         self.modo_accion = "mover"
         self.agregar_log("Nueva expedición.", "victoria")
         self.agregar_log("Encuentra el oro, tómalo y regresa a la Cueva 1 para escapar.", "normal")
 
-    def _calcular_coordenadas_cuadricula(self):
-        self.coords_cuevas.clear()
-        cx = 325
-        cy = 380
-        spacing = 110
-
-        for y in range(5):
-            for x in range(5):
-                c = y * 5 + x + 1
-                px = cx + (x - 2) * spacing
-                py = cy - (y - 2) * spacing
-                self.coords_cuevas[c] = (px, py)
-
     def obtener_cueva_bajo_cursor(self, mx, my):
-        for c, (cx, cy) in self.coords_cuevas.items():
+        for c, (cx, cy) in self.juego.coords.items():
             if (mx - cx) ** 2 + (my - cy) ** 2 <= (self.radio_cueva + 4) ** 2:
                 return c
         return None
@@ -742,52 +834,44 @@ class WumpusPygameApp:
 
     def _render(self):
         self.screen.fill(COLOR_BG)
-        self._dibujar_red_cuadricula()
+        self._dibujar_red_pentagonal()
         self._dibujar_panel_derecho()
         self._dibujar_estado_final()
         if self.mostrar_menu_mecanicas:
             self._dibujar_menu_mecanicas()
         pygame.display.flip()
 
-    def _dibujar_red_cuadricula(self):
+    def _dibujar_red_pentagonal(self):
         mouse_pos = pygame.mouse.get_pos()
         cueva_hover = self.obtener_cueva_bajo_cursor(*mouse_pos)
         vecinos_jugador = self.juego.grafo.get(self.juego.pos_jugador, [])
         partida_terminada = (not self.juego.vivo) or (self.juego.pos_jugador == 1 and self.juego.tiene_oro)
 
-        for c in range(1, self.juego.total_cuevas + 1):
-            x, y = self.juego._cueva_a_xy(c)
-            p1 = self.coords_cuevas[c]
+        for cara in self.juego.caras:
+            pts = [self.juego.coords[v] for v in cara]
+            pygame.draw.polygon(self.screen, COLOR_FACE, pts)
+            pygame.draw.polygon(self.screen, COLOR_FACE_BORDER, pts, 1)
 
-            if x < self.juego.tamano - 1:
-                c_este = self.juego._xy_a_cueva(x + 1, y)
-                p2 = self.coords_cuevas[c_este]
-                arista = (min(c, c_este), max(c, c_este))
-                
-                if arista in self.juego.bloqueos:
-                    pygame.draw.line(self.screen, COLOR_TUNNEL_BLOCKED, p1, p2, 5)
-                    mx, my = (p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2
-                    pygame.draw.line(self.screen, COLOR_RED, (mx - 6, my - 6), (mx + 6, my + 6), 3)
-                    pygame.draw.line(self.screen, COLOR_RED, (mx - 6, my + 6), (mx + 6, my - 6), 3)
-                elif c_este in self.juego.grafo.get(c, []):
-                    c_tun = COLOR_TUNNEL_ACTIVE if (c == self.juego.pos_jugador or c_este == self.juego.pos_jugador) else COLOR_TUNNEL
-                    pygame.draw.line(self.screen, c_tun, p1, p2, 4)
+        aristas_dibujadas = set()
+        for u, vecinos in self.juego.grafo.items():
+            p1 = self.juego.coords[u]
+            for v in vecinos:
+                arista = (min(u, v), max(u, v))
+                if arista not in aristas_dibujadas:
+                    aristas_dibujadas.add(arista)
+                    p2 = self.juego.coords[v]
 
-            if y < self.juego.tamano - 1:
-                c_norte = self.juego._xy_a_cueva(x, y + 1)
-                p2 = self.coords_cuevas[c_norte]
-                arista = (min(c, c_norte), max(c, c_norte))
-                
-                if arista in self.juego.bloqueos:
-                    pygame.draw.line(self.screen, COLOR_TUNNEL_BLOCKED, p1, p2, 5)
-                    mx, my = (p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2
-                    pygame.draw.line(self.screen, COLOR_RED, (mx - 6, my - 6), (mx + 6, my + 6), 3)
-                    pygame.draw.line(self.screen, COLOR_RED, (mx - 6, my + 6), (mx + 6, my - 6), 3)
-                elif c_norte in self.juego.grafo.get(c, []):
-                    c_tun = COLOR_TUNNEL_ACTIVE if (c == self.juego.pos_jugador or c_norte == self.juego.pos_jugador) else COLOR_TUNNEL
-                    pygame.draw.line(self.screen, c_tun, p1, p2, 4)
+                    if arista in self.juego.bloqueos:
+                        pygame.draw.line(self.screen, COLOR_TUNNEL_BLOCKED, p1, p2, 5)
+                        mx, my = (p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2
+                        pygame.draw.line(self.screen, COLOR_RED, (mx - 6, my - 6), (mx + 6, my + 6), 3)
+                        pygame.draw.line(self.screen, COLOR_RED, (mx - 6, my + 6), (mx + 6, my - 6), 3)
+                    else:
+                        es_activo = (u == self.juego.pos_jugador or v == self.juego.pos_jugador)
+                        c_tun = COLOR_TUNNEL_ACTIVE if es_activo else COLOR_TUNNEL
+                        pygame.draw.line(self.screen, c_tun, p1, p2, 4)
 
-        for c, (cx, cy) in self.coords_cuevas.items():
+        for c, (cx, cy) in self.juego.coords.items():
             es_jugador = (c == self.juego.pos_jugador)
             es_visitada = (c in self.juego.habitaciones_visitadas)
             es_vecino = (c in vecinos_jugador) and (not partida_terminada)
@@ -864,7 +948,7 @@ class WumpusPygameApp:
 
         txt_titulo = self.font_title.render("EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
         self.screen.blit(txt_titulo, (panel_x, 14))
-        txt_sub = self.font_small.render("Cuadrícula de 25 cuevas (5x5)", True, COLOR_SUBTEXT)
+        txt_sub = self.font_small.render("Mosaico de pentágonos (30 cuevas)", True, COLOR_SUBTEXT)
         self.screen.blit(txt_sub, (panel_x, 40))
 
         self.btn_mecanicas_rect = pygame.Rect(panel_x + panel_w - 125, 12, 125, 26)
@@ -936,7 +1020,7 @@ class WumpusPygameApp:
         txt_bru = self.font_normal.render(f"Brújula: {bru_str}", True, COLOR_CYAN if self.juego.tiene_brujula else COLOR_TEXT)
         self.screen.blit(txt_bru, (panel_x + 140, cur_y + 54))
 
-        txt_pos = self.font_normal.render(f"Cueva: {self.juego.pos_jugador}/25", True, COLOR_TEXT)
+        txt_pos = self.font_normal.render(f"Cueva: {self.juego.pos_jugador}/{self.juego.total_cuevas}", True, COLOR_TEXT)
         self.screen.blit(txt_pos, (panel_x + 270, cur_y + 54))
         cur_y += 90
 
@@ -1088,7 +1172,7 @@ class WumpusPygameApp:
         self.screen.blit(txt_causa, (box_x + 20, box_y + 40))
 
         lines = [
-            f"• Cuevas exploradas ({stats['cuevas_visitadas']}/25): +{stats['puntos_cuevas']} pts",
+            f"• Cuevas exploradas ({stats['cuevas_visitadas']}/{self.juego.total_cuevas}): +{stats['puntos_cuevas']} pts",
             f"• Oro tomado: +{stats['puntos_oro']} pts" if stats['puntos_oro'] > 0 else None,
             f"• Brújula obtenida: +{stats['puntos_brujula']} pts" if stats['puntos_brujula'] > 0 else None,
             f"• Wumpus derrotado: +{stats['puntos_wumpus']} pts" if stats['puntos_wumpus'] > 0 else None,
@@ -1154,8 +1238,8 @@ class WumpusPygameApp:
             ("   Oculta en una cueva. Al tomarla, te orienta con rumbo", COLOR_TEXT),
             ("   magnético hacia el oro o hacia la salida (Cueva 1).", COLOR_TEXT),
             ("", COLOR_TEXT),
-            ("5. Mapa de 25 Cuevas Siempre Ganable:", COLOR_GOLD),
-            ("   Cuadrícula 5x5 con ruta transitable garantizada.", COLOR_TEXT),
+            ("5. Mosaico de Pentágonos Siempre Ganable:", COLOR_GOLD),
+            ("   Mapa compuesto de pentágonos con ruta transitable.", COLOR_TEXT),
             ("", COLOR_TEXT),
             ("6. Sistema de Puntuación y Eficiencia:", COLOR_GOLD),
             ("   Gana puntos por explorar, oro, cazar y recursos.", COLOR_TEXT),

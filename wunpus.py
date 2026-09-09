@@ -461,7 +461,8 @@ class MundoWumpus:
                 self.mover_wumpus_aleatorio()
 
     def mostrar_mapa(self, revelar_todo=False):
-        print("  --- MAPA DE CUEVAS (J=Tú, .=Visitada, ?=Niebla) ---")
+        titulo = "MAPA DE CUEVAS (REVELADO COMPLETO)" if revelar_todo else "MAPA DE CUEVAS EXPLORADAS"
+        print(f"  --- {titulo} ---")
         for y in range(self.tamano - 1, -1, -1):
             fila_nodos = "  "
             for x in range(self.tamano):
@@ -506,6 +507,15 @@ class MundoWumpus:
                     if x < self.tamano - 1:
                         fila_vert += "     "
                 print(fila_vert)
+
+        print("\nLeyenda de símbolos:")
+        if not revelar_todo:
+            print("  Cuevas : [N:?] = Desconocida/Niebla | [N:J] = Tu posición | [N:JO] = Posición con Oro | [N:.] = Visitada y vacía")
+            print("  Túneles: (--- / |) = Túnel transitable | (-x- / x) = Túnel bloqueado por derrumbe")
+        else:
+            print("  Cuevas : [N:J] = Jugador | [N:W] = Wumpus | [N:MW] = Wumpus Muerto | [N:O] = Oro | [N:B] = Brújula")
+            print("           [N:P] = Pozo sin fondo | [N:M] = Murciélagos | [N:R] = Roca inestable | [N:.] = Cueva vacía")
+            print("  Túneles: (--- / |) = Túnel transitable | (-x- / x) = Túnel bloqueado por derrumbe")
 
     def describir_cueva(self):
         print(f"\nESTÁS EN LA CUEVA {self.pos_jugador}")

@@ -594,7 +594,8 @@ class MundoWumpus:
 
         vecinos = self.grafo.get(self.pos_jugador, [])
         lista_vecinos = ", ".join(f"Cueva {v}" for v in vecinos)
-        print(f"[Túneles disponibles]: Puedes moverte a: {lista_vecinos}")
+        ej_v = vecinos[0] if vecinos else 2
+        print(f"[Túneles disponibles]: Puedes moverte a: {lista_vecinos} (ej: escribe '{ej_v}' o 'mover {ej_v}')")
 
         if self.modo_caceria and self.wumpus_vivo:
             if self.distraccion_wumpus > 0:
@@ -794,7 +795,7 @@ def imprimir_ayuda():
 
 def imprimir_recordatorio_ayuda():
     print("-" * 64)
-    print("Escribe 'ayuda' (o '?') para consultar la lista de comandos disponibles.")
+    print("Consejo: Escribe 'ayuda' (o '?') para consultar todos los comandos.")
     print("=" * 64)
 
 
@@ -852,14 +853,22 @@ def ejecutar_juego():
         juego.mostrar_mapa()
         juego.describir_cueva()
 
+        percepciones_actuales = juego.percibir()
+        vecinos_actuales = juego.grafo.get(juego.pos_jugador, [])
+        ej_cueva = vecinos_actuales[0] if vecinos_actuales else 2
+
         if juego.pos_jugador == juego.pos_oro and not juego.tiene_oro:
-            prompt_texto = "\n¿Qué deseas hacer? (escribe 'tomar' para el oro o número de cueva para moverte): "
+            prompt_texto = f"\n¿Qué deseas hacer? (escribe 'tomar' para el oro o '{ej_cueva}' para moverte): "
         elif juego.pos_jugador == juego.pos_brujula and not juego.tiene_brujula:
-            prompt_texto = "\n¿Qué deseas hacer? (escribe 'tomar' para la brújula o número de cueva para moverte): "
+            prompt_texto = f"\n¿Qué deseas hacer? (escribe 'tomar' para la brújula o '{ej_cueva}' para moverte): "
         elif juego.modo_caceria and juego.wumpus_vivo and juego.cebos > 0:
-            prompt_texto = "\n¿Qué deseas hacer? (ej: 'mover 2' o 'cebo N' para distraer): "
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: '{ej_cueva}' para moverte o 'cebo {ej_cueva}' para distraer): "
+        elif "Hedor" in percepciones_actuales and juego.wumpus_vivo:
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: 'disparar {ej_cueva}', 'lanzar {ej_cueva}' o '{ej_cueva}'): "
+        elif "Brisa" in percepciones_actuales:
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: 'lanzar {ej_cueva}' con piedra o 'mover {ej_cueva}'): "
         else:
-            prompt_texto = "\n¿Qué deseas hacer?: "
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: 'mover {ej_cueva}' o simplemente '{ej_cueva}'): "
 
         imprimir_recordatorio_ayuda()
         entrada = input(prompt_texto)

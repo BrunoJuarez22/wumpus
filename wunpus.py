@@ -21,14 +21,25 @@ def imprimir_novedades():
        - Chillidos y aleteo: Nido de murciélagos gigantes.
        - Crujido de piedra: Techo inestable a punto de desplomarse.
 
-3. Partida Siempre Ganable:
+3. Cebo de Carne (Equipo Inicial):
+   * Nuevo: Cuentas con 1 cebo de carne ('cebo X' o 'c X').
+     Si lo lanzas a una cueva vecina, su olor atrae al Wumpus y lo distrae
+     durante 2 turnos, deteniendo su persecución para darte tiempo a escapar.
+
+4. Brújula de Exploración (Objeto en Cueva):
+   * Nuevo: Hay una brújula antigua oculta en las cuevas.
+     Al tomarla ('tomar' o 't'), te orienta magnéticamente indicando
+     la dirección hacia el oro (o hacia la Cueva 1 de salida si ya tienes el oro).
+
+5. Partida Siempre Ganable y Mapa de 25 Cuevas:
    * Original: Los pozos al azar podían bloquear la cueva inicial.
-   * Nuevo: El mapa siempre se genera con un camino seguro
+   * Nuevo: Cuadrícula expandida de 5x5 con camino seguro garantizado
      para encontrar el oro y regresar a la salida.
 
-4. Sistema de Puntuación y Eficiencia:
+6. Sistema de Puntuación y Eficiencia:
    * Gana puntos explorando cuevas (+50), cazando al Wumpus (+1000),
-     tomando el oro (+1000), detectando ecos (+100) y ahorrando recursos.
+     tomando el oro (+1000), encontrando la brújula (+300), detectando ecos (+100),
+     distrayendo con cebo (+150) y ahorrando recursos.
    * Bonus multiplicativo (hasta x2.5): entre menos movimientos
      emplees para ir por el oro y regresar, mayor será tu puntuación.
 ======================================================================
@@ -45,6 +56,7 @@ class MundoWumpus:
         self.pos_jugador = 1
         self.pos_wumpus = None
         self.pos_oro = None
+        self.pos_brujula = None
         self.pos_pozos = []
         self.pos_murcielagos = []
         self.pos_derrumbe = None
@@ -53,11 +65,15 @@ class MundoWumpus:
         
         self.vivo = True
         self.tiene_oro = False
+        self.tiene_brujula = False
         self.wumpus_vivo = True
         self.modo_caceria = False
         self.turnos_caceria = 0
+        self.distraccion_wumpus = 0
+        self.cebo_distrajo_wumpus = False
         self.flechas = 1
         self.piedras = 4 if self.total_cuevas >= 25 else 3
+        self.cebos = 1
         self.habitaciones_visitadas = {self.pos_jugador}
         
         self.movimientos_totales = 0
@@ -151,6 +167,9 @@ class MundoWumpus:
             
             self.pos_derrumbe = random.choice(cuevas)
             cuevas.remove(self.pos_derrumbe)
+
+            self.pos_brujula = random.choice(cuevas)
+            cuevas.remove(self.pos_brujula)
             
             self.pos_pozos = [c for c in cuevas if random.random() < 0.2]
             
@@ -171,6 +190,8 @@ class MundoWumpus:
             percepciones.append("Crujido")
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             percepciones.append("Brillo")
+        if self.pos_jugador == self.pos_brujula and not self.tiene_brujula:
+            percepciones.append("Destello metálico")
             
         return percepciones
 
@@ -179,65 +200,66 @@ class MundoWumpus:
         if vecinos:
             self.pos_wumpus = random.choice(vecinos)
             if self.pos_wumpus == self.pos_jugador:
-                print("\nEl Wumpus entra a tu cueva al huir.")
-                self.causa_muerte = "El Wumpus tropezó contigo en su huida y te devoró."
+                print("\nEl Wumpus ha entrado a tu cueva mientras huía.")
                 self.verificar_estado()
 
     def cazar_jugador(self):
         camino = self._obtener_camino_wumpus()
         if camino and len(camino) > 1:
-            siguiente_cueva = camino[1]
-            self.pos_wumpus = siguiente_cueva
-            distancia = len(camino) - 2
+            paso_siguiente = camino[1]
+            self.pos_wumpus = paso_siguiente
             
-            if self.pos_wumpus == self.pos_jugador:
-                print("\nEl Wumpus entra a tu cueva.")
-                self.causa_muerte = "El Wumpus te alcanzó durante la cacería y te devoró."
-                self.verificar_estado()
+            dist = len(camino) - 2
+            if dist == 0:
+                print("\nEl Wumpus ha entrado a tu cueva.")
+                self.causa_muerte = "El Wumpus te alcanzó y te devoró."
+                self.vivo = False
             else:
-                sufijo = "s" if distancia > 1 else ""
-                print(f"\nEl Wumpus avanza hacia ti (está a {distancia} cueva{sufijo} de distancia).")
+                sufijo = "s" if dist > 1 else ""
+                print(f"\nEl suelo tiembla... El Wumpus se ha movido. Está a {dist} cueva{sufijo} de ti.")
         else:
-            print("\nEscuchas un rugido a lo lejos. El Wumpus busca una ruta hacia ti.")
             self.mover_wumpus_aleatorio()
 
     def activar_derrumbe(self):
         if self.derrumbe_ocurrido:
             return
             
-        self.derrumbe_ocurrido = True
-        print("\nSe produce un desprendimiento de rocas del techo.")
-        
-        pos = self.pos_jugador
-        vecinos = list(self.grafo.get(pos, []))
+        vecinos = list(self.grafo.get(self.pos_jugador, []))
         random.shuffle(vecinos)
         
-        tunel_bloqueado = False
+        bloqueado = False
         for v in vecinos:
-            self.grafo[pos].remove(v)
-            self.grafo[v].remove(pos)
+            self.grafo[self.pos_jugador].remove(v)
+            self.grafo[v].remove(self.pos_jugador)
             
-            camino_inicio = self._existe_camino_seguro(self.pos_jugador, 1)
-            camino_oro = True if self.tiene_oro else self._existe_camino_seguro(self.pos_jugador, self.pos_oro)
-            
-            if camino_inicio and camino_oro:
-                tunel_bloqueado = True
-                self.bloqueos.add((min(pos, v), max(pos, v)))
-                print(f"Un derrumbe selló el paso entre Cueva {pos} y Cueva {v}. Ese túnel ya no existe.")
+            camino_ok = self._existe_camino_seguro(self.pos_jugador, 1)
+            if not self.tiene_oro and camino_ok:
+                camino_ok = self._existe_camino_seguro(self.pos_jugador, self.pos_oro)
+                
+            if camino_ok:
+                arista = (min(self.pos_jugador, v), max(self.pos_jugador, v))
+                self.bloqueos.add(arista)
+                self.derrumbe_ocurrido = True
+                bloqueado = True
+                print(f"\nUn derrumbe ha sellado el túnel entre la Cueva {self.pos_jugador} y la Cueva {v}.")
                 break
             else:
-                self.grafo[pos].append(v)
-                self.grafo[v].append(pos)
+                self.grafo[self.pos_jugador].append(v)
+                self.grafo[v].append(self.pos_jugador)
+                self.grafo[self.pos_jugador].sort()
+                self.grafo[v].sort()
                 
-        if not tunel_bloqueado:
-            print("Cayeron rocas del techo, pero lograste esquivarlas.")
+        if not bloqueado:
+            self.derrumbe_ocurrido = True
+            print("\nUn temblor sacude la cueva y caen rocas, pero los túneles resisten.")
 
     def mover(self, nueva_pos):
-        if nueva_pos in self.grafo.get(self.pos_jugador, []):
+        vecinos = self.grafo.get(self.pos_jugador, [])
+        if nueva_pos in vecinos:
             self.pos_jugador = nueva_pos
-            self.movimientos_totales += 1
             self.habitaciones_visitadas.add(nueva_pos)
-            print(f"\nTe has movido a la Cueva {self.pos_jugador} (Movimiento #{self.movimientos_totales}).")
+            self.movimientos_totales += 1
+            print(f"\nTe has desplazado a la Cueva {nueva_pos}.")
             
             if self.pos_jugador == self.pos_derrumbe and not self.derrumbe_ocurrido:
                 self.activar_derrumbe()
@@ -248,16 +270,20 @@ class MundoWumpus:
                 self.verificar_murcielagos()
                 
             if self.vivo and self.modo_caceria and self.wumpus_vivo:
-                self.turnos_caceria += 1
-                if self.turnos_caceria % 2 == 0:
-                    self.cazar_jugador()
+                if self.distraccion_wumpus > 0:
+                    self.distraccion_wumpus -= 1
+                    print(f"\nEl Wumpus sigue devorando el cebo y no avanza este turno ({self.distraccion_wumpus} turno(s) de distracción restante(s)).")
                 else:
-                    dist = self._distancia_al_jugador()
-                    sufijo = "s" if dist > 1 else ""
-                    print(f"\nEl Wumpus te acecha a {dist} cueva{sufijo} de distancia...")
+                    self.turnos_caceria += 1
+                    if self.turnos_caceria % 2 == 0:
+                        self.cazar_jugador()
+                    else:
+                        dist = self._distancia_al_jugador()
+                        sufijo = "s" if dist > 1 else ""
+                        print(f"\nEl Wumpus te acecha a {dist} cueva{sufijo} de distancia...")
         else:
             vecinos = self.grafo.get(self.pos_jugador, [])
-            print(f"\n¡No hay túnel directo hacia la Cueva {nueva_pos}! Cuevas conectadas: {vecinos}")
+            print(f"\nNo hay túnel directo hacia la Cueva {nueva_pos}. Cuevas conectadas: {vecinos}")
 
     def verificar_murcielagos(self):
         if self.pos_jugador in self.pos_murcielagos:
@@ -314,9 +340,81 @@ class MundoWumpus:
         else:
             print("  > ... La piedra rueda por el suelo de roca sin novedad. Parece seguro.")
 
+    def lanzar_cebo(self, objetivo):
+        if self.cebos <= 0:
+            print("\nYa no te quedan cebos en el morral.")
+            return
+
+        vecinos = self.grafo.get(self.pos_jugador, [])
+        if objetivo not in vecinos:
+            print(f"\nSolo puedes lanzar el cebo a una cueva contigua conectada: {vecinos}")
+            return
+
+        self.cebos -= 1
+        print(f"\nLanzas un trozo de carne fresca hacia la Cueva {objetivo}...")
+
+        if objetivo == self.pos_wumpus and self.wumpus_vivo:
+            self.distraccion_wumpus = 2
+            self.cebo_distrajo_wumpus = True
+            print("  > El Wumpus devora la carne con avidez y se distrae por 2 turnos.")
+        elif self.modo_caceria and self.wumpus_vivo:
+            self.distraccion_wumpus = 2
+            self.cebo_distrajo_wumpus = True
+            if objetivo not in self.pos_pozos:
+                self.pos_wumpus = objetivo
+            print("  > El Wumpus huele la carne, salta hacia la cueva y se distrae por 2 turnos.")
+        else:
+            print("  > El cebo queda en el suelo de la cueva.")
+
+    def consultar_brujula(self, silencioso=False):
+        if not self.tiene_brujula:
+            if not silencioso:
+                print("\nNo tienes ninguna brújula en tu inventario.")
+            return None
+
+        if not self.tiene_oro:
+            obj_cueva = self.pos_oro
+            nombre_meta = "el cofre de oro"
+        else:
+            obj_cueva = 1
+            nombre_meta = "la salida (Cueva 1)"
+
+        if self.pos_jugador == obj_cueva:
+            msg = f"La aguja gira sobre sí misma: ¡{nombre_meta} está en esta cueva!"
+        else:
+            xj, yj = self._cueva_a_xy(self.pos_jugador)
+            xo, yo = self._cueva_a_xy(obj_cueva)
+            dy = yo - yj
+            dx = xo - xj
+
+            if dy > 0 and dx > 0:
+                rumbo = "Noreste"
+            elif dy > 0 and dx < 0:
+                rumbo = "Noroeste"
+            elif dy < 0 and dx > 0:
+                rumbo = "Sureste"
+            elif dy < 0 and dx < 0:
+                rumbo = "Suroeste"
+            elif dy > 0:
+                rumbo = "Norte"
+            elif dy < 0:
+                rumbo = "Sur"
+            elif dx > 0:
+                rumbo = "Este"
+            else:
+                rumbo = "Oeste"
+            msg = f"La aguja magnética apunta hacia el {rumbo} (hacia {nombre_meta})."
+
+        if not silencioso:
+            print(f"\n[Brújula]: {msg}")
+        return msg
+
     def tomar(self):
+        algo_tomado = False
+
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             self.tiene_oro = True
+            algo_tomado = True
             print("\nHas tomado el cofre de oro (+1000 pts).")
             print("Ahora debes regresar a la Cueva 1 para escapar.")
             
@@ -324,10 +422,20 @@ class MundoWumpus:
                 self.modo_caceria = True
                 print("\nEl Wumpus huele el oro y despierta.")
                 print("Modo cacería activado. El Wumpus avanzará hacia ti cada 2 turnos.")
-        elif self.tiene_oro:
-            print("\nYa tienes el oro en tu mochila.")
-        else:
-            print("\nNo hay nada que tomar en esta cueva.")
+
+        if self.pos_jugador == self.pos_brujula and not self.tiene_brujula:
+            self.tiene_brujula = True
+            algo_tomado = True
+            print("\nHas tomado la brújula de exploración (+300 pts).")
+            print("Ahora puedes orientarte hacia el oro escribiendo 'brujula' (o 'b').")
+
+        if not algo_tomado:
+            if self.tiene_oro and self.pos_jugador == self.pos_oro:
+                print("\nYa tienes el oro en tu mochila.")
+            elif self.tiene_brujula and self.pos_jugador == self.pos_brujula:
+                print("\nYa tomaste la brújula de esta cueva.")
+            else:
+                print("\nNo hay nada que tomar en esta cueva.")
 
     def agarrar(self):
         return self.tomar()
@@ -376,13 +484,14 @@ class MundoWumpus:
                 self.mover_wumpus_aleatorio()
 
     def mostrar_mapa(self, revelar_todo=False):
-        titulo = "--- MAPA DE CUEVAS (REVELADO) ---" if revelar_todo else "--- MAPA DE CUEVAS EXPLORADAS ---"
-        print(f"\n{titulo}")
+        titulo = "MAPA DE CUEVAS (REVELADO)" if revelar_todo else "MAPA DE CUEVAS EXPLORADAS"
+        print(f"\n--- {titulo} ---")
         
         for y in range(self.tamano - 1, -1, -1):
             fila_nodos = "  "
             for x in range(self.tamano):
                 c = self._xy_a_cueva(x, y)
+                
                 if c == self.pos_jugador:
                     tag = "JO" if self.tiene_oro else "J"
                 elif revelar_todo:
@@ -390,6 +499,8 @@ class MundoWumpus:
                         tag = "W" if self.wumpus_vivo else "MW"
                     elif c == self.pos_oro:
                         tag = "O"
+                    elif c == self.pos_brujula and not self.tiene_brujula:
+                        tag = "B"
                     elif c in self.pos_pozos:
                         tag = "P"
                     elif c in self.pos_murcielagos:
@@ -439,59 +550,73 @@ class MundoWumpus:
         print("\nLeyenda:")
         if not revelar_todo:
             print("  Cuevas: [N:?] = Desconocida, [N:J ] = Tu posición actual, [N:.] = Visitada y vacía")
-            print("  Túneles: (--- / |) = Túnel abierto, (-x- / x) = Túnel bloqueado por derrumbe\n")
+            print("  Túneles: (--- / |) = Túnel abierto, (-x- / x) = Túnel bloqueado por derrumbe")
         else:
             print("  Cuevas: [N:J] = Jugador, [N:W] = Wumpus, [N:MW] = Wumpus Muerto, [N:O] = Oro")
-            print("          [N:P] = Pozo, [N:M] = Murciélagos, [N:R] = Roca inestable, [N:.] = Vacía")
-            print("  Túneles: (--- / |) = Túnel abierto, (-x- / x) = Túnel bloqueado por derrumbe\n")
+            print("          [N:B] = Brújula, [N:P] = Pozo, [N:M] = Murciélagos, [N:R] = Roca inestable, [N:.] = Vacía")
+            print("  Túneles: (--- / |) = Túnel abierto, (-x- / x) = Túnel bloqueado por derrumbe")
+        print()
 
     def describir_cueva(self):
-        print("\n" + "=" * 56)
-        print(f"  ESTÁS EN LA CUEVA {self.pos_jugador}")
+        print(f"\n{'=' * 56}")
+        print(f"               ESTÁS EN LA CUEVA {self.pos_jugador}")
         print("=" * 56)
-        
+
         percepciones = self.percibir()
+        print("\n[Percepciones sensoriales]:")
         if percepciones:
-            print("[Percepciones en esta cueva]:")
             for p in percepciones:
                 if p == "Hedor":
-                    print("  * Hedor: Huele a Wumpus cerca.")
+                    print("  * Hedor insoportable: El Wumpus está cerca.")
                 elif p == "Brisa":
-                    print("  * Brisa: Sientes una corriente de aire frío (hay un pozo cerca).")
+                    print("  * Brisa fría y húmeda: Sientes la corriente de un pozo cercano.")
                 elif p == "Aleteo":
-                    print("  * Aleteo: Escuchas murciélagos cerca.")
+                    print("  * Aleteo distante: Murciélagos gigantes habitan cerca.")
                 elif p == "Crujido":
-                    print("  * Crujido: El techo de roca cruje (zona inestable).")
+                    print("  * Crujido de piedra: Techo inestable a punto de desplomarse.")
                 elif p == "Brillo":
-                    print("  * Brillo: Hay un cofre de oro en esta cueva (usa 'tomar').")
+                    print("  * Brillo resplandeciente: El cofre de oro está en esta cueva.")
+                elif p == "Destello metálico":
+                    print("  * Destello metálico: Hay una brújula antigua en el suelo de esta cueva.")
         else:
-            print("[Percepciones]:")
             print("  * Silencio. No percibes peligros contiguos.")
+
+        if self.tiene_brujula:
+            lectura = self.consultar_brujula(silencioso=True)
+            print(f"\n[Brújula]: {lectura}")
 
         vecinos = self.grafo.get(self.pos_jugador, [])
         lista_vecinos = ", ".join(f"Cueva {v}" for v in vecinos)
         print(f"\n[Túneles disponibles]: Puedes moverte a: {lista_vecinos}")
 
         estado_caceria = "\n  [Alerta: El Wumpus está despierto y te está buscando]" if self.modo_caceria and self.wumpus_vivo else ""
-        print(f"[Inventario]: Flechas: {self.flechas} | Piedras: {self.piedras} | Oro: {'Sí' if self.tiene_oro else 'No'}{estado_caceria}")
+        estado_distraccion = f"\n  [El Wumpus está ocupado comiendo el cebo ({self.distraccion_wumpus} turno(s) restante(s))]" if self.distraccion_wumpus > 0 and self.wumpus_vivo else ""
+        brujula_txt = "Sí" if self.tiene_brujula else "No"
+        print(f"[Inventario]: Flechas: {self.flechas} | Piedras: {self.piedras} | Cebos: {self.cebos} | Brújula: {brujula_txt} | Oro: {'Sí' if self.tiene_oro else 'No'}{estado_caceria}{estado_distraccion}")
         print("=" * 56)
 
     def calcular_puntuacion(self):
         puntos_cuevas = len(self.habitaciones_visitadas) * 50
         puntos_oro = 1000 if self.tiene_oro else 0
+        puntos_brujula = 300 if self.tiene_brujula else 0
         puntos_wumpus = 1000 if not self.wumpus_vivo else 0
         puntos_ecos = self.ecos_detectados * 100
-        puntos_flecha = self.flechas * 200
+        puntos_flecha = 200 if self.flechas > 0 else 0
         puntos_piedras = self.piedras * 50
+        puntos_cebo_usado = 150 if self.cebo_distrajo_wumpus else 0
+        puntos_cebo_guardado = self.cebos * 100
         puntos_escape = 2000 if (self.pos_jugador == 1 and self.tiene_oro and self.vivo) else 0
 
         subtotal_base = (
             puntos_cuevas +
             puntos_oro +
+            puntos_brujula +
             puntos_wumpus +
             puntos_ecos +
             puntos_flecha +
             puntos_piedras +
+            puntos_cebo_usado +
+            puntos_cebo_guardado +
             puntos_escape
         )
 
@@ -515,11 +640,14 @@ class MundoWumpus:
             "puntos_cuevas": puntos_cuevas,
             "cuevas_visitadas": len(self.habitaciones_visitadas),
             "puntos_oro": puntos_oro,
+            "puntos_brujula": puntos_brujula,
             "puntos_wumpus": puntos_wumpus,
             "puntos_ecos": puntos_ecos,
             "ecos_detectados": self.ecos_detectados,
             "puntos_flecha": puntos_flecha,
             "puntos_piedras": puntos_piedras,
+            "puntos_cebo_usado": puntos_cebo_usado,
+            "puntos_cebo_guardado": puntos_cebo_guardado,
             "puntos_escape": puntos_escape,
             "subtotal_base": subtotal_base,
             "movs_minimos": movs_minimos,
@@ -550,14 +678,20 @@ class MundoWumpus:
         print(f"  * Cuevas exploradas ({stats['cuevas_visitadas']}/{self.total_cuevas}):           +{stats['puntos_cuevas']:>5} pts (50 pts c/u)")
         if stats['puntos_oro'] > 0:
             print(f"  * Cofre de oro tomado:                      +{stats['puntos_oro']:>5} pts")
+        if stats['puntos_brujula'] > 0:
+            print(f"  * Brújula de orientación recuperada:       +{stats['puntos_brujula']:>5} pts")
         if stats['puntos_wumpus'] > 0:
             print(f"  * Wumpus derrotado con flecha:             +{stats['puntos_wumpus']:>5} pts")
         if stats['ecos_detectados'] > 0:
             print(f"  * Pistas y ecos con piedras ({stats['ecos_detectados']}):            +{stats['puntos_ecos']:>5} pts (100 pts c/u)")
+        if stats['puntos_cebo_usado'] > 0:
+            print(f"  * Cebo usado para distraer al Wumpus:       +{stats['puntos_cebo_usado']:>5} pts")
         if stats['puntos_flecha'] > 0:
             print(f"  * Munición de flecha conservada:            +{stats['puntos_flecha']:>5} pts")
         if stats['puntos_piedras'] > 0:
             print(f"  * Piedras conservadas en la bolsa ({self.piedras}):        +{stats['puntos_piedras']:>5} pts (50 pts c/u)")
+        if stats['puntos_cebo_guardado'] > 0:
+            print(f"  * Cebo de carne conservado en morral ({self.cebos}):   +{stats['puntos_cebo_guardado']:>5} pts (100 pts c/u)")
         if stats['puntos_escape'] > 0:
             print(f"  * Bonificación de escape:                  +{stats['puntos_escape']:>5} pts")
 
@@ -597,6 +731,8 @@ def parse_comando(entrada):
         return "novedades", None
     if cmd in ["tomar", "agarrar", "grab", "oro", "t", "g", "a"]:
         return "tomar", None
+    if cmd in ["brujula", "b", "compass"]:
+        return "brujula", None
 
     if texto.isdigit():
         return "mover", int(texto)
@@ -619,6 +755,11 @@ def parse_comando(entrada):
             return "lanzar", num
         return "lanzar_invalido", None
 
+    if cmd in ["cebo", "carne", "c"]:
+        if num is not None:
+            return "cebo", num
+        return "cebo_invalido", None
+
     return "desconocido", texto
 
 
@@ -627,7 +768,9 @@ def imprimir_ayuda():
     print("  mover N     (o solo 'N')     : Desplazarte a la Cueva N conectada (ej: 'mover 2' o '2').")
     print("  disparar N  (o 'f N', 'd N') : Disparar una flecha en línea recta hacia la Cueva N.")
     print("  lanzar N    (o 'p N', 'l N') : Lanzar una piedra a la Cueva N para tantear peligros.")
-    print("  tomar       (o 't', 'oro')   : Tomar el cofre de oro (activa la cacería del Wumpus).")
+    print("  cebo N      (o 'c N')        : Lanzar carne a la Cueva N para distraer al Wumpus 2 turnos.")
+    print("  tomar       (o 't', 'oro')   : Tomar el oro o la brújula que se encuentre en la cueva.")
+    print("  brujula     (o 'b')          : Consultar la dirección cardinal al oro o a la salida.")
     print("  mapa        (o 'm')          : Mostrar el mapa con la numeración de cuevas y niebla.")
     print("  novedades   (o 'reglas')     : Ver las novedades del juego.")
     print("  ayuda       (o '?')          : Mostrar esta lista de comandos.")
@@ -679,8 +822,14 @@ if __name__ == "__main__":
             juego.lanzar_piedra(args)
         elif accion == "lanzar_invalido":
             print("\n[!] Especifica a qué cueva lanzar la piedra. Ejemplo: 'lanzar 2' o 'p 2'.")
+        elif accion == "cebo":
+            juego.lanzar_cebo(args)
+        elif accion == "cebo_invalido":
+            print("\n[!] Especifica a qué cueva lanzar el cebo. Ejemplo: 'cebo 2' o 'c 2'.")
         elif accion == "tomar":
             juego.tomar()
+        elif accion == "brujula":
+            juego.consultar_brujula()
         elif accion == "mapa":
             juego.mostrar_mapa()
         elif accion == "novedades":

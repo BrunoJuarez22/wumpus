@@ -19,7 +19,9 @@ Sistema de puntuación: Puntuación base acumulativa + Multiplicador de eficienc
   a la versión original del juego de 1972:
   - Modo Cacería del Wumpus.
   - Lanzamiento de Piedras (4 en bolsa).
-  - Partida Siempre Ganable.
+  - Cebo de Carne táctico (equipo inicial).
+  - Brújula Antigua de exploración (objeto coleccionable en cueva).
+  - Partida Siempre Ganable y mapa expandido de 25 cuevas (5x5).
   - Sistema de Puntuación y Eficiencia de movimientos.
 Funcionamiento en programación:
   - Despliega una cadena multilínea formateada sin tecnicismos para el usuario.
@@ -31,7 +33,7 @@ Representa el estado completo de la cueva, las posiciones de los elementos,
 las reglas del entorno y la lógica de interacción del jugador y criaturas.
 
 
-2.1. __init__(self, tamano=4)
+2.1. __init__(self, tamano=5)
 ¿Qué hace?
   Es el constructor de la clase. Inicializa todas las variables de partida.
 Funcionamiento en programación:
@@ -40,18 +42,23 @@ Funcionamiento en programación:
   - `self.grafo`: Diccionario `{cueva_id: [cuevas_vecinas]}`.
   - `self.pos_jugador`: Cueva actual del jugador (inicia siempre en la Cueva 1).
   - `self.pos_wumpus`, `self.pos_oro`: Identificador entero de cueva.
+  - `self.pos_brujula`: Cueva donde se encuentra oculta la brújula antigua.
   - `self.pos_pozos`: Lista de enteros con cuevas que contienen pozos.
-  - `self.pos_murcielagos`: Lista con la cueva del nido de murciélagos.
+  - `self.pos_murcielagos`: Lista con las cuevas de nidos de murciélagos (2 en 5x5).
   - `self.pos_derrumbe`: Cueva con el techo inestable.
   - `self.derrumbe_ocurrido`: Booleano para activar el derrumbe solo una vez.
   - `self.bloqueos`: Conjunto `{(u, v)}` con los túneles sellados por rocas.
   - `self.vivo`: Booleano que indica si el jugador sigue con vida.
   - `self.tiene_oro`: Booleano que indica si tomó el cofre de oro.
+  - `self.tiene_brujula`: Booleano que indica si tomó la brújula antigua.
   - `self.wumpus_vivo`: Booleano de estado del monstruo.
   - `self.modo_caceria`: Booleano que activa la persecución tras tomar el oro.
   - `self.turnos_caceria`: Contador de turnos para regular la velocidad del Wumpus.
+  - `self.distraccion_wumpus`: Contador de turnos que el Wumpus pasa comiendo el cebo.
+  - `self.cebo_distrajo_wumpus`: Booleano para otorgar bonificación de puntos por distracción.
   - `self.flechas`: Cantidad de flechas disponibles (inicia con 1).
-  - `self.piedras`: Cantidad de piedras para tantear (inicia con 3).
+  - `self.piedras`: Cantidad de piedras para tantear (inicia con 4 en 5x5).
+  - `self.cebos`: Cantidad de cebos de carne en el morral (inicia con 1).
   - `self.habitaciones_visitadas`: Conjunto de cuevas exploradas (niebla de guerra).
   - `self.movimientos_totales`: Contador de desplazamientos realizados por el jugador.
   - `self.ecos_detectados`: Contador de peligros detectados o impactos con piedras.
@@ -95,15 +102,15 @@ Funcionamiento en programación:
 
 2.6. inicializar_elementos(self)
 ¿Qué hace?
-  Ubica aleatoriamente los elementos en las cuevas 2 a 25, validando que la partida
-  sea 100% ganable antes de iniciar.
+  Ubica aleatoriamente los elementos en las cuevas 2 a 25 (Wumpus, oro, nidos de murciélagos,
+  derrumbe, brújula y pozos), validando que la partida sea 100% ganable antes de iniciar.
 
 
 2.7. percibir(self)
 ¿Qué hace?
   Examina las cuevas vecinas conectadas y retorna las pistas sensoriales percibidas:
-  "Hedor" (Wumpus), "Brisa" (Pozo), "Aleteo" (Murciélagos), "Crujido" (Roca inestable)
-  o "Brillo" (si el oro está en la cueva actual).
+  "Hedor" (Wumpus), "Brisa" (Pozo), "Aleteo" (Murciélagos), "Crujido" (Roca inestable),
+  "Brillo" (si el oro está en la cueva actual) o "Destello metálico" (si la brújula está en la cueva actual).
 
 
 2.8. mover_wumpus_aleatorio(self)
@@ -116,7 +123,7 @@ Funcionamiento en programación:
 ¿Qué hace?
   Controla la inteligencia artificial de persecución del Wumpus en Modo Cacería.
 Funcionamiento en programación:
-  - Obtiene el camino más corto hacia el jugador y avanza un paso por él.
+  - Obtiene el camino más corto hacia el jugador y avanza un paso por él cada 2 turnos.
   - Si alcanza la cueva del jugador, lo devora de inmediato y registra la causa de muerte.
 
 
@@ -129,7 +136,8 @@ Funcionamiento en programación:
 2.11. mover(self, nueva_pos)
 ¿Qué hace?
   Desplaza al jugador a la cueva indicada si hay un túnel conectado directo.
-  Incrementa `self.movimientos_totales`, verifica trampas y avanza la cacería.
+  Incrementa `self.movimientos_totales`, verifica trampas y avanza la cacería
+  (respetando los turnos de distracción si el Wumpus está comiendo cebo).
 
 
 2.12. verificar_murcielagos(self) y verificar_estado(self)
@@ -145,46 +153,64 @@ Funcionamiento en programación:
   o descubrir rocas inestables (+100 pts de exploración).
 
 
-2.14. tomar(self) / agarrar(self)
+2.14. lanzar_cebo(self, objetivo)
 ¿Qué hace?
-  Toma el cofre de oro si el explorador está en la cueva correcta (+1000 pts), despertando
-  de inmediato al Wumpus en Modo Cacería.
+  Lanza un cebo de carne a una cueva contigua. Si el Wumpus está en ella o en Modo Cacería,
+  el monstruo se detiene a comer la carne y queda distraído durante 2 turnos (+150 pts),
+  sin avanzar hacia el explorador.
 
 
-2.15. disparar(self, objetivo)
+2.15. tomar(self) / agarrar(self)
+¿Qué hace?
+  Recoge el objeto presente en la cueva actual:
+  - El cofre de oro (+1000 pts), despertando al Wumpus en Modo Cacería.
+  - La brújula de exploración (+300 pts), que desbloquea la orientación cardinal.
+
+
+2.16. consultar_brujula(self, silencioso=False)
+¿Qué hace?
+  Calcula el vector cartesiano relativo y traduce la orientación hacia el objetivo:
+  - Si el jugador no tiene el oro: apunta hacia el cofre de oro (Norte, Sur, Este, Oeste, Noreste, etc.).
+  - Si el jugador ya tiene el oro: apunta hacia la Cueva 1 para facilitar el escape.
+
+
+2.17. disparar(self, objetivo)
 ¿Qué hace?
   Dispara la flecha en línea recta a través de la cueva indicada. Si el Wumpus
   se encuentra en esa trayectoria, muere de inmediato (+1000 pts).
 
 
-2.16. mostrar_mapa(self, revelar_todo=False)
+2.18. mostrar_mapa(self, revelar_todo=False)
 ¿Qué hace?
   Imprime en consola el mapa con la numeración de cuevas en formato `[N:?]`,
   mostrando las conexiones con túneles abiertos (`---`, `|`) o derrumbados (`-x-`, `x`).
 
 
-2.17. describir_cueva(self)
+2.19. describir_cueva(self)
 ¿Qué hace?
   Imprime en pantalla la descripción inmersiva de la cueva actual:
-  título `ESTÁS EN LA CUEVA N`, pistas sensoriales completas, lista de túneles
-  disponibles a los que se puede saltar, e inventario con alerta de cacería.
+  título `ESTÁS EN LA CUEVA N`, pistas sensoriales completas, lectura automática
+  de la brújula (si se posee), lista de túneles disponibles e inventario con cebos y estado de cacería.
 
 
-2.18. calcular_puntuacion(self)
+2.20. calcular_puntuacion(self)
 ¿Qué hace?
   Calcula el puntaje detallado de la partida y el bonus multiplicativo de eficiencia:
   - +50 pts por cada cueva explorada.
-  - +1000 pts por conseguir el oro.
+  - +1000 pts por tomar el oro.
+  - +300 pts por encontrar la brújula.
   - +1000 pts por abatir al Wumpus con la flecha.
   - +100 pts por cada eco/peligro detectado con piedras.
+  - +150 pts por usar el cebo para distraer al Wumpus.
   - +200 pts por la flecha si no fue gastada.
   - +50 pts por cada piedra conservada en la bolsa.
+  - +100 pts por cada cebo conservado en el morral.
   - +2000 pts por escapar con vida a la Cueva 1 con el oro.
   - Multiplicador de eficiencia: compara la cantidad mínima teórica de movimientos
     de ida y vuelta con los movimientos reales realizados por el jugador (hasta x2.50).
 
 
-2.19. imprimir_resumen_puntuacion(self)
+2.21. imprimir_resumen_puntuacion(self)
 ¿Qué hace?
   Despliega en pantalla el reporte final con el desglose de puntos, la causa del desenlace
   (muerte o victoria), el análisis de eficiencia de movimientos y la puntuación total obtenida.
@@ -199,7 +225,7 @@ Funcionamiento en programación:
 Funcionamiento en programación:
   - Si el usuario escribe solo un número (ej: `2`), lo interpreta directamente como `mover 2`.
   - Reconoce verbos y abreviaturas: `mover 2`, `m 2`, `disparar 2`, `f 2`, `lanzar 2`, `p 2`,
-    `agarrar`, `oro`, `mapa`, `m`, `novedades`, `ayuda`, `salir`.
+    `cebo 2`, `c 2`, `tomar`, `t`, `oro`, `brujula`, `b`, `mapa`, `m`, `novedades`, `ayuda`, `salir`.
 
 
 3.2. imprimir_ayuda()

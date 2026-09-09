@@ -1,17 +1,39 @@
 import random
 import re
+import math
+import sys
 from collections import deque
+import pygame
+
+COLOR_BG = (24, 24, 37)
+COLOR_PANEL = (30, 30, 46)
+COLOR_BORDER = (49, 50, 68)
+COLOR_TEXT = (205, 214, 244)
+COLOR_SUBTEXT = (166, 173, 200)
+COLOR_GOLD = (249, 226, 175)
+COLOR_RED = (243, 139, 168)
+COLOR_GREEN = (166, 227, 161)
+COLOR_CYAN = (137, 220, 235)
+COLOR_PURPLE = (203, 166, 247)
+COLOR_ORANGE = (250, 179, 135)
+
+COLOR_TUNNEL = (45, 47, 65)
+COLOR_TUNNEL_INNER = (65, 68, 95)
+COLOR_PENT_FOG = (17, 17, 27)
+COLOR_PENT_FOG_BORDER = (35, 36, 52)
+COLOR_PENT_VISITED = (40, 42, 60)
+COLOR_PENT_VISITED_BORDER = (75, 78, 108)
+COLOR_PENT_PLAYER = (35, 60, 95)
+COLOR_PENT_PLAYER_BORDER = (137, 180, 250)
+
 
 class MundoWumpus:
-    def __init__(self, tamano=4, callback_notificar=None):
+    def __init__(self, tamano=4, callback_log=None):
         self.tamano = tamano
-        self.callback_notificar = callback_notificar
-        self.historial_mensajes = []
-        
+        self.callback_log = callback_log
         self.grafo = {}
         self.construir_grafo()
         
-        # Posiciones de los elementos
         self.pos_jugador = (0, 0)
         self.pos_wumpus = None
         self.pos_oro = None
@@ -32,29 +54,23 @@ class MundoWumpus:
         
         self.inicializar_elementos()
 
-    def notificar(self, mensaje):
-        """Registra un mensaje y lo envía al callback de la GUI o a print() en terminal."""
-        self.historial_mensajes.append(mensaje)
-        if self.callback_notificar:
-            self.callback_notificar(mensaje)
+    def notificar(self, mensaje, tipo="normal"):
+        if self.callback_log:
+            self.callback_log(mensaje, tipo)
         else:
             print(mensaje)
 
     def construir_grafo(self):
-        """Construye un grafo no dirigido representando una cuadrícula."""
         for x in range(self.tamano):
             for y in range(self.tamano):
                 vecinos = []
-                # Conectar con las habitaciones adyacentes (Aristas no dirigidas)
-                if x > 0: vecinos.append((x - 1, y)) # Izquierda
-                if x < self.tamano - 1: vecinos.append((x + 1, y)) # Derecha
-                if y > 0: vecinos.append((x, y - 1)) # Abajo
-                if y < self.tamano - 1: vecinos.append((x, y + 1)) # Arriba
-                
+                if x > 0: vecinos.append((x - 1, y))
+                if x < self.tamano - 1: vecinos.append((x + 1, y))
+                if y > 0: vecinos.append((x, y - 1))
+                if y < self.tamano - 1: vecinos.append((x, y + 1))
                 self.grafo[(x, y)] = vecinos
 
     def _existe_camino_seguro(self, inicio, destino):
-        """Verifica mediante BFS si existe un camino desde inicio hasta destino sin pisar pozos."""
         cola = deque([inicio])
         visitados = {inicio}
         while cola:
@@ -68,7 +84,6 @@ class MundoWumpus:
         return False
 
     def _obtener_camino_wumpus(self):
-        """Calcula el camino más corto del Wumpus al jugador evitando pozos mediante BFS."""
         cola = deque([[self.pos_wumpus]])
         visitados = {self.pos_wumpus}
         while cola:
@@ -83,20 +98,15 @@ class MundoWumpus:
         return None
 
     def _distancia_al_jugador(self):
-        """Devuelve la distancia en pasos de grafo del Wumpus al jugador."""
         camino = self._obtener_camino_wumpus()
         if camino:
             return len(camino) - 1
         return abs(self.pos_wumpus[0] - self.pos_jugador[0]) + abs(self.pos_wumpus[1] - self.pos_jugador[1])
 
     def inicializar_elementos(self):
-        """
-        Coloca el Wumpus, el oro, los pozos, los murciélagos y la zona de derrumbe.
-        Garantiza mediante BFS que el mapa sea siempre solucionable (existe camino sin pozos hacia el oro).
-        """
         while True:
             habitaciones = list(self.grafo.keys())
-            habitaciones.remove((0, 0)) # El inicio siempre es seguro
+            habitaciones.remove((0, 0))
             
             self.pos_wumpus = random.choice(habitaciones)
             habitaciones.remove(self.pos_wumpus)
@@ -104,66 +114,48 @@ class MundoWumpus:
             self.pos_oro = random.choice(habitaciones)
             habitaciones.remove(self.pos_oro)
             
-            # Murciélagos gigantes (1 habitación)
             pos_bat = random.choice(habitaciones)
             self.pos_murcielagos = [pos_bat]
             habitaciones.remove(pos_bat)
             
-            # Zona inestable propensa a desprendimiento de rocas (1 habitación)
             self.pos_derrumbe = random.choice(habitaciones)
             habitaciones.remove(self.pos_derrumbe)
             
-            # Colocar pozos con 20% de probabilidad en habitaciones restantes
             self.pos_pozos = [hab for hab in habitaciones if random.random() < 0.2]
             
-            # Validar que exista al menos un camino seguro hasta el oro
             if self._existe_camino_seguro((0, 0), self.pos_oro):
                 break
 
     def percibir(self):
-        """Devuelve las percepciones en el nodo actual del jugador."""
         percepciones = []
         vecinos = self.grafo.get(self.pos_jugador, [])
         
-        # Percibir hedor
         if self.wumpus_vivo and (self.pos_wumpus in vecinos or self.pos_jugador == self.pos_wumpus):
             percepciones.append("Hedor")
-            
-        # Percibir brisa
         if any(pozo in vecinos for pozo in self.pos_pozos):
             percepciones.append("Brisa")
-            
-        # Percibir aleteo (murciélagos gigantes)
         if any(bat in vecinos for bat in self.pos_murcielagos):
             percepciones.append("Aleteo")
-            
-        # Percibir crujido (zona inestable / rocas sueltas)
         if self.pos_derrumbe in vecinos and not self.derrumbe_ocurrido:
             percepciones.append("Crujido")
-            
-        # Percibir brillo
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             percepciones.append("Brillo")
             
         return percepciones
 
     def mover_wumpus_aleatorio(self):
-        """Desplaza al Wumpus a una habitación adyacente libre de pozos."""
         if not self.wumpus_vivo:
             return
             
         candidatos = [n for n in self.grafo.get(self.pos_wumpus, []) if n not in self.pos_pozos]
         if candidatos:
             self.pos_wumpus = random.choice(candidatos)
-            self.notificar("\n¡Escuchas pasos pesados y un bufido feroz en la penumbra! El Wumpus ha cambiado de habitación.")
+            self.notificar("¡Pasos pesados en la oscuridad! El Wumpus ha cambiado de cueva.", "alerta")
             if self.pos_wumpus == self.pos_jugador:
-                self.notificar("¡¡EL WUMPUS HA ENTRADO EN TU HABITACIÓN!!")
+                self.notificar("¡¡EL WUMPUS HA ENTRADO EN TU HABITACIÓN!!", "peligro")
                 self.verificar_estado()
 
     def cazar_jugador(self):
-        """
-        En modo cacería, el Wumpus calcula la ruta más corta hacia el jugador y avanza un paso.
-        """
         if not self.wumpus_vivo or not self.modo_caceria:
             return
 
@@ -174,25 +166,21 @@ class MundoWumpus:
             distancia_restante = len(camino) - 2
             
             if self.pos_wumpus == self.pos_jugador:
-                self.notificar("\n¡¡EL WUMPUS IRRUMPE VELOZMENTE EN TU HABITACIÓN CON LAS FAUCES ABIERTAS!!")
+                self.notificar("¡¡EL WUMPUS TE ALCANZA Y TE DEVORA DE UN BOCADO!!", "peligro")
                 self.verificar_estado()
             else:
                 sufijo = "es" if distancia_restante > 1 else ""
-                self.notificar(f"\n¡¡PASOS PESADOS Y RASPADO DE GARRAS!! El Wumpus avanza hacia ti (está a {distancia_restante} habitación{sufijo} de distancia).")
+                self.notificar(f"¡Garras en la piedra! El Wumpus acecha a {distancia_restante} cueva{sufijo}.", "alerta")
         else:
-            self.notificar("\n¡Escuchas un rugido frustrado a lo lejos! El Wumpus intenta buscar una ruta hacia ti.")
+            self.notificar("Rugido lejano: el Wumpus busca otra ruta.", "alerta")
             self.mover_wumpus_aleatorio()
 
     def activar_derrumbe(self):
-        """
-        Provoca un desprendimiento de rocas en la habitación inestable.
-        Bloquea un túnel adyacente eliminando la arista del grafo sin romper la solubilidad.
-        """
         if self.derrumbe_ocurrido:
             return
             
         self.derrumbe_ocurrido = True
-        self.notificar("\n¡¡CRRAAAACK... BOOOM!! ¡Se produce un violento desprendimiento de rocas del techo!")
+        self.notificar("¡CRRAAAACK! ¡Derrumbe violento de rocas en el techo!", "derrumbe")
         
         pos = self.pos_jugador
         vecinos = list(self.grafo.get(pos, []))
@@ -209,33 +197,29 @@ class MundoWumpus:
             if camino_inicio and camino_oro:
                 tunel_bloqueado = True
                 self.bloqueos.add((min(pos, v), max(pos, v)))
-                self.notificar(f"¡Rocas gigantes han sellado el paso entre {pos} y {v}! Ese túnel ya no existe.")
+                self.notificar(f"¡Rocas sellan el túnel entre {pos} y {v}!", "derrumbe")
                 break
             else:
                 self.grafo[pos].append(v)
                 self.grafo[v].append(pos)
                 
         if not tunel_bloqueado:
-            self.notificar("¡Grandes rocas se desploman sobre el suelo rozándote! Logras esquivarlas a tiempo.")
+            self.notificar("¡Rocas se desploman rozándote! Logras esquivarlas.", "derrumbe")
 
     def mover(self, nueva_pos):
-        """Mueve al jugador a un nodo adyacente usando las aristas del grafo."""
         if nueva_pos in self.grafo.get(self.pos_jugador, []):
             self.pos_jugador = nueva_pos
             self.habitaciones_visitadas.add(nueva_pos)
-            self.notificar(f"\nTe has movido a {self.pos_jugador}")
+            self.notificar(f"Te has movido a la cueva {self.pos_jugador}", "movimiento")
             
-            # Comprobar desprendimiento de rocas
             if self.pos_jugador == self.pos_derrumbe and not self.derrumbe_ocurrido:
                 self.activar_derrumbe()
                 
             self.verificar_estado()
             
-            # Comprobar murciélagos gigantes si sigue vivo
             if self.vivo:
                 self.verificar_murcielagos()
                 
-            # Avance de la cacería del Wumpus si el jugador sigue con vida
             if self.vivo and self.modo_caceria and self.wumpus_vivo:
                 self.turnos_caceria += 1
                 if self.turnos_caceria % 2 == 0:
@@ -243,102 +227,87 @@ class MundoWumpus:
                 else:
                     dist = self._distancia_al_jugador()
                     sufijo = "es" if dist > 1 else ""
-                    self.notificar(f"\n¡Sientes un bufido cavernoso y el suelo vibrar! El Wumpus te acecha a {dist} habitación{sufijo}...")
+                    self.notificar(f"Vibración en el suelo: el Wumpus está a {dist} cueva{sufijo}...", "alerta")
+            return True
         else:
-            self.notificar(f"\n¡No hay camino hacia {nueva_pos}! Habitaciones conectadas: {self.grafo.get(self.pos_jugador, [])}")
+            self.notificar(f"No hay túnel directo hacia {nueva_pos}", "error")
+            return False
 
     def verificar_murcielagos(self):
-        """Comprueba si el jugador entró a la habitación de los murciélagos gigantes."""
         if self.pos_jugador in self.pos_murcielagos:
-            self.notificar("\n¡¡SWOOOOSH!! ¡Una bandada de murciélagos gigantes te atrapa con sus garras y te alza en vuelo!")
+            self.notificar("¡SWOOOSH! ¡Murciélagos gigantes te llevan por el aire!", "murcielago")
             posibles = [h for h in self.grafo.keys() if h != self.pos_jugador]
             destino = random.choice(posibles)
-            self.notificar(f"¡Te dejan caer en la habitación {destino} y huyen hacia la oscuridad!")
+            self.notificar(f"¡Te dejan caer en la cueva {destino}!", "murcielago")
             self.pos_jugador = destino
             self.habitaciones_visitadas.add(destino)
             
             libres = [h for h in posibles if h != destino and h != (0, 0)]
             self.pos_murcielagos = [random.choice(libres)]
-            
             self.verificar_estado()
 
     def verificar_estado(self):
-        """Comprueba si el jugador cayó en un pozo o fue comido por el Wumpus."""
         if self.pos_jugador in self.pos_pozos:
-            self.notificar("\n¡AAAAAAHHHH! Caíste en un pozo infinito. Fin del juego.")
+            self.notificar("¡¡AAAAAAHH!! Caíste en un pozo infinito. Fin del juego.", "muerte")
             self.vivo = False
         elif self.pos_jugador == self.pos_wumpus and self.wumpus_vivo:
-            self.notificar("\n¡CRUNCH! El Wumpus te ha devorado. Fin del juego.")
+            self.notificar("¡¡CRUNCH!! El Wumpus te ha devorado. Fin del juego.", "muerte")
             self.vivo = False
 
     def lanzar_piedra(self, objetivo):
-        """
-        Lanza una piedra hacia una habitación adyacente para tantear su contenido.
-        Si el Wumpus está en cacería, el ruido puede distraerlo temporalmente.
-        """
         if self.piedras <= 0:
-            self.notificar("\nYa no te quedan piedras en la bolsa.")
-            return
+            self.notificar("Ya no te quedan piedras en la bolsa.", "error")
+            return False
 
         if objetivo not in self.grafo.get(self.pos_jugador, []):
-            self.notificar(f"\nSolo puedes lanzar piedras a habitaciones directamente conectadas: {self.grafo.get(self.pos_jugador, [])}")
-            return
+            self.notificar(f"Solo puedes lanzar piedras a cuevas adyacentes: {self.grafo.get(self.pos_jugador, [])}", "error")
+            return False
 
         self.piedras -= 1
-        self.notificar(f"\n¡Lanzas una piedra hacia {objetivo}! Escuchas atentamente...")
+        self.notificar(f"Lanzas una piedra hacia {objetivo}...", "accion")
 
         if objetivo in self.pos_pozos:
-            self.notificar("  > ... ¡SPLASH! Escuchas el eco lejano de la piedra cayendo al abismo de un pozo.")
+            self.notificar("  > ... ¡SPLASH! Eco distante cayendo a un pozo sin fondo.", "pista")
         elif objetivo == self.pos_wumpus and self.wumpus_vivo:
-            self.notificar("  > ... ¡¡ROAAAR!! La piedra golpeó al Wumpus y ruge enfurecido.")
+            self.notificar("  > ... ¡¡ROAAAR!! Golpeaste al Wumpus y huye enfurecido.", "alerta")
             self.mover_wumpus_aleatorio()
         elif objetivo in self.pos_murcielagos:
-            self.notificar("  > ... ¡¡CHIIIRP!! Escuchas un chillido agudo y un frenético aleteo. ¡Hay murciélagos gigantes!")
+            self.notificar("  > ... ¡¡CHIIIRP!! Chillidos y aleteo de murciélagos gigantes.", "pista")
         elif objetivo == self.pos_derrumbe and not self.derrumbe_ocurrido:
-            self.notificar("  > ... ¡CRAC! La piedra impacta el techo y cae polvo y guijarros. ¡El techo es inestable!")
+            self.notificar("  > ... ¡CRAC! Caen piedras del techo. Es una zona inestable.", "pista")
         else:
-            self.notificar("  > ... ¡Clac-clac! La piedra rueda por el suelo de roca sin novedad. Parece seguro.")
+            self.notificar("  > ... ¡Clac-clac! Rueda tranquilamente por piedra sólida.", "pista")
 
-        # Distracción en cacería
         if self.modo_caceria and self.wumpus_vivo:
-            self.notificar("  > ¡El eco confunde al Wumpus por un momento, retrasando su avance!")
+            self.notificar("  > El eco despista al Wumpus y retrasa su persecución.", "accion")
             self.turnos_caceria = max(0, self.turnos_caceria - 1)
 
-        self.notificar(f"Te quedan {self.piedras} piedras.")
+        return True
 
     def agarrar(self):
-        """Intenta agarrar el oro en la posición actual. Activa el modo cacería del Wumpus si está vivo."""
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             self.tiene_oro = True
-            self.notificar("\n¡Has agarrado el Oro!")
+            self.notificar("¡HAS COGIDO EL ORO! 💰 Regresa a (0, 0) para escapar.", "victoria")
             
             if self.wumpus_vivo:
                 self.modo_caceria = True
-                self.notificar("\n" + "!" * 58)
-                self.notificar(" ¡¡¡ROAAAR ENSORDECEDOR RESONANDO EN TODA LA CUEVA!!! ")
-                self.notificar(" El Wumpus ha olido el brillo del oro y ENTRA EN CACERÍA. ")
-                self.notificar(" ¡Te persigue activamente! Huye a (0, 0) antes de ser cazado. ")
-                self.notificar("!" * 58)
-            else:
-                self.notificar("Ahora regresa a (0, 0) para escapar y ganar.")
+                self.notificar("¡¡ROAAAR!! El Wumpus huele el oro e INICIA CACERÍA.", "alerta")
+            return True
         elif self.tiene_oro:
-            self.notificar("\nYa tienes el oro en tu mochila.")
+            self.notificar("Ya tienes el oro en tu mochila.", "error")
+            return False
         else:
-            self.notificar("\nNo hay nada que agarrar aquí.")
+            self.notificar("No hay nada que agarrar en esta cueva.", "error")
+            return False
 
     def disparar(self, objetivo):
-        """
-        Dispara una flecha en línea recta hacia la dirección del objetivo.
-        No descuenta la flecha si la dirección es inválida.
-        Si mata al Wumpus, detiene la cacería.
-        """
         if self.flechas <= 0:
-            self.notificar("\nYa no te quedan flechas.")
-            return
+            self.notificar("Ya no te quedan flechas.", "error")
+            return False
 
         if objetivo == self.pos_jugador:
-            self.notificar("\nNo puedes disparar a tu propia habitación.")
-            return
+            self.notificar("No puedes disparar a tu propia cueva.", "error")
+            return False
 
         x_orig, y_orig = self.pos_jugador
         x_dest, y_dest = objetivo
@@ -347,14 +316,14 @@ class MundoWumpus:
         dy = y_dest - y_orig
 
         if dx != 0 and dy != 0:
-            self.notificar("\nNo puedes disparar en diagonal. Dispara en línea recta (arriba, abajo, izquierda o derecha).")
-            return
+            self.notificar("Solo puedes disparar en línea recta (N, S, E, O).", "error")
+            return False
 
         paso_x = 1 if dx > 0 else (-1 if dx < 0 else 0)
         paso_y = 1 if dy > 0 else (-1 if dy < 0 else 0)
 
         self.flechas -= 1
-        self.notificar(f"\n¡Disparas la flecha hacia ({paso_x:+d}, {paso_y:+d})! La flecha silba velozmente en la oscuridad...")
+        self.notificar(f"¡La flecha silba en dirección ({paso_x:+d}, {paso_y:+d})!", "accion")
 
         cur_x, cur_y = x_orig + paso_x, y_orig + paso_y
         impacto = False
@@ -363,191 +332,461 @@ class MundoWumpus:
             if (cur_x, cur_y) == self.pos_wumpus and self.wumpus_vivo:
                 self.wumpus_vivo = False
                 impacto = True
-                self.notificar(f"¡¡¡GRITO ESCALOFRIANTE en ({cur_x}, {cur_y})!!! Has matado al Wumpus.")
+                self.notificar(f"¡¡GRITO ESCALOFRIANTE en ({cur_x}, {cur_y})!! Has matado al Wumpus.", "victoria")
                 if self.modo_caceria:
                     self.modo_caceria = False
-                    self.notificar("¡La cueva queda en silencio sepulcral! La cacería ha terminado, estás a salvo.")
+                    self.notificar("La cueva queda en silencio. La cacería ha terminado.", "victoria")
                 break
             cur_x += paso_x
             cur_y += paso_y
 
         if not impacto:
-            self.notificar("¡Clac! La flecha se estrelló contra una pared lejana. No acertaste.")
+            self.notificar("¡Clac! La flecha se pierde en la oscuridad sin acertar.", "alerta")
             if self.wumpus_vivo and not self.modo_caceria:
                 self.mover_wumpus_aleatorio()
 
-    def mostrar_mapa(self, revelar_todo=False):
-        """Muestra una representación gráfica en consola del mundo 4x4."""
-        titulo = "--- MAPA DE LA CUEVA (REVELADO) ---" if revelar_todo else "--- MAPA EXPLORADO ---"
-        print(f"\n{titulo}")
-        print("   " + " ".join([f"  {x}  " for x in range(self.tamano)]))
-        print("  +" + "------+" * self.tamano)
-        
-        for y in range(self.tamano - 1, -1, -1):
-            fila_str = f"{y} |"
-            for x in range(self.tamano):
-                pos = (x, y)
-                if pos == self.pos_jugador:
-                    celda = "J+O" if self.tiene_oro else " J "
-                elif revelar_todo:
-                    if pos == self.pos_wumpus:
-                        celda = " W " if self.wumpus_vivo else "MW "
-                    elif pos == self.pos_oro:
-                        celda = " O "
-                    elif pos in self.pos_pozos:
-                        celda = " P "
-                    elif pos in self.pos_murcielagos:
-                        celda = " M "
-                    elif pos == self.pos_derrumbe:
-                        celda = " R "
+        return True
+
+
+class WumpusPygameApp:
+    def __init__(self):
+        pygame.init()
+        pygame.font.init()
+
+        self.width = 1080
+        self.height = 720
+        self.screen = pygame.display.set_mode((self.width, self.height))
+        pygame.display.set_caption("🏹 El Mundo del Wumpus - Mapa Pentagonal")
+
+        self.clock = pygame.time.Clock()
+        self.running = True
+
+        self.font_title = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 22, bold=True)
+        self.font_bold = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 15, bold=True)
+        self.font_normal = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13)
+        self.font_small = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 11)
+        self.font_emoji = pygame.font.SysFont(["segoe ui emoji", "segoe ui symbol", "arial"], 22)
+        self.font_emoji_large = pygame.font.SysFont(["segoe ui emoji", "segoe ui symbol", "arial"], 28)
+
+        self.log_mensajes = []
+        self.modo_accion = "mover"
+        self.juego = None
+        self.pentagonos = {}
+        self.radius = 46
+
+        self._calcular_geometria_pentagonos()
+        self.nueva_partida()
+
+    def agregar_log(self, mensaje, tipo="normal"):
+        self.log_mensajes.append((mensaje, tipo))
+        if len(self.log_mensajes) > 12:
+            self.log_mensajes.pop(0)
+
+    def nueva_partida(self):
+        self.log_mensajes.clear()
+        self.juego = MundoWumpus(callback_log=self.agregar_log)
+        self.modo_accion = "mover"
+        self.agregar_log("⚔️ ¡Nueva expedición iniciada en la cueva!", "victoria")
+        self.agregar_log("Encuentra el oro y regresa con vida a (0, 0).", "normal")
+
+    def _calcular_geometria_pentagonos(self):
+        self.pentagonos.clear()
+        offset_x = 105
+        offset_y = 120
+        spacing_x = 142
+        spacing_y = 142
+
+        for x in range(4):
+            for y in range(4):
+                cx = offset_x + x * spacing_x
+                cy = offset_y + (3 - y) * spacing_y
+                vertices = []
+                for k in range(5):
+                    angle = -math.pi / 2 + k * (2 * math.pi / 5)
+                    vx = cx + self.radius * math.cos(angle)
+                    vy = cy + self.radius * math.sin(angle)
+                    vertices.append((vx, vy))
+                self.pentagonos[(x, y)] = {
+                    "centro": (cx, cy),
+                    "vertices": vertices
+                }
+
+    def obtener_cueva_bajo_cursor(self, mx, my):
+        for pos, datos in self.pentagonos.items():
+            cx, cy = datos["centro"]
+            dist_sq = (mx - cx) ** 2 + (my - cy) ** 2
+            if dist_sq <= self.radius ** 2:
+                return pos
+        return None
+
+    def interactuar_con_cueva(self, objetivo):
+        if not self.juego.vivo:
+            return
+
+        if self.modo_accion == "mover":
+            if objetivo == self.juego.pos_jugador:
+                if self.juego.pos_jugador == self.juego.pos_oro and not self.juego.tiene_oro:
+                    self.juego.agarrar()
+            elif objetivo in self.juego.grafo.get(self.juego.pos_jugador, []):
+                self.juego.mover(objetivo)
+            else:
+                self.agregar_log("No hay túnel hacia esa cueva.", "error")
+
+        elif self.modo_accion == "disparar":
+            if self.juego.disparar(objetivo):
+                self.modo_accion = "mover"
+
+        elif self.modo_accion == "lanzar":
+            if self.juego.lanzar_piedra(objetivo):
+                self.modo_accion = "mover"
+
+    def mover_direccion(self, dx, dy):
+        if not self.juego.vivo:
+            return
+        x, y = self.juego.pos_jugador
+        objetivo = (x + dx, y + dy)
+        self.interactuar_con_cueva(objetivo)
+
+    def run(self):
+        while self.running:
+            self.clock.tick(60)
+            self._handle_events()
+            self._render()
+
+        pygame.quit()
+        sys.exit()
+
+    def _handle_events(self):
+        mouse_pos = pygame.mouse.get_pos()
+        cueva_hover = self.obtener_cueva_bajo_cursor(*mouse_pos)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Comprobar clics en botones de acción
+                if self.btn_disparar_rect.collidepoint(event.pos):
+                    if self.juego.flechas > 0 and self.juego.vivo:
+                        self.modo_accion = "disparar" if self.modo_accion != "disparar" else "mover"
+                        if self.modo_accion == "disparar":
+                            self.agregar_log("Modo DISPARAR: Haz clic en una cueva contigua.", "alerta")
                     else:
-                        celda = " . "
+                        self.agregar_log("No tienes flechas disponibles.", "error")
+
+                elif self.btn_lanzar_rect.collidepoint(event.pos):
+                    if self.juego.piedras > 0 and self.juego.vivo:
+                        self.modo_accion = "lanzar" if self.modo_accion != "lanzar" else "mover"
+                        if self.modo_accion == "lanzar":
+                            self.agregar_log("Modo PIEDRA: Haz clic en una cueva contigua para escuchar.", "alerta")
+                    else:
+                        self.agregar_log("No te quedan piedras.", "error")
+
+                elif self.btn_agarrar_rect.collidepoint(event.pos):
+                    if self.juego.vivo:
+                        self.juego.agarrar()
+
+                elif self.btn_reiniciar_rect.collidepoint(event.pos):
+                    self.nueva_partida()
+
+                # Comprobar clics en el mapa pentagonal
+                elif cueva_hover is not None:
+                    self.interactuar_con_cueva(cueva_hover)
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_w, pygame.K_UP):
+                    self.mover_direccion(0, 1)
+                elif event.key in (pygame.K_s, pygame.K_DOWN):
+                    self.mover_direccion(0, -1)
+                elif event.key in (pygame.K_a, pygame.K_LEFT):
+                    self.mover_direccion(-1, 0)
+                elif event.key in (pygame.K_d, pygame.K_RIGHT):
+                    self.mover_direccion(1, 0)
+                elif event.key == pygame.K_f:
+                    if self.juego.flechas > 0 and self.juego.vivo:
+                        self.modo_accion = "disparar" if self.modo_accion != "disparar" else "mover"
+                elif event.key == pygame.K_p:
+                    if self.juego.piedras > 0 and self.juego.vivo:
+                        self.modo_accion = "lanzar" if self.modo_accion != "lanzar" else "mover"
+                elif event.key in (pygame.K_g, pygame.K_SPACE):
+                    if self.juego.vivo:
+                        self.juego.agarrar()
+                elif event.key == pygame.K_r:
+                    self.nueva_partida()
+                elif event.key == pygame.K_ESCAPE:
+                    self.modo_accion = "mover"
+
+    def _render(self):
+        self.screen.fill(COLOR_BG)
+        self._dibujar_mapa_pentagonal()
+        self._dibujar_panel_derecho()
+        self._dibujar_estado_final()
+        pygame.display.flip()
+
+    def _dibujar_mapa_pentagonal(self):
+        mouse_pos = pygame.mouse.get_pos()
+        cueva_hover = self.obtener_cueva_bajo_cursor(*mouse_pos)
+        vecinos_jugador = self.juego.grafo.get(self.juego.pos_jugador, [])
+        partida_terminada = (not self.juego.vivo) or (self.juego.pos_jugador == (0, 0) and self.juego.tiene_oro)
+
+        # 1. Dibujar túneles (aristas del grafo no dirigido)
+        trazados = set()
+        for u, vecinos in self.juego.grafo.items():
+            for v in vecinos:
+                arista = (min(u, v), max(u, v))
+                if arista not in trazados:
+                    trazados.add(arista)
+                    p1 = self.pentagonos[u]["centro"]
+                    p2 = self.pentagonos[v]["centro"]
+                    pygame.draw.line(self.screen, COLOR_TUNNEL, p1, p2, 10)
+                    pygame.draw.line(self.screen, COLOR_TUNNEL_INNER, p1, p2, 6)
+
+        # Dibujar túneles derrumbados / bloqueados
+        for u, v in self.juego.bloqueos:
+            p1 = self.pentagonos[u]["centro"]
+            p2 = self.pentagonos[v]["centro"]
+            mid_x = (p1[0] + p2[0]) / 2
+            mid_y = (p1[1] + p2[1]) / 2
+            pygame.draw.circle(self.screen, (50, 20, 20), (int(mid_x), int(mid_y)), 15)
+            pygame.draw.line(self.screen, COLOR_RED, (mid_x - 8, mid_y - 8), (mid_x + 8, mid_y + 8), 3)
+            pygame.draw.line(self.screen, COLOR_RED, (mid_x - 8, mid_y + 8), (mid_x + 8, mid_y - 8), 3)
+
+        # 2. Dibujar habitaciones pentagonales
+        time_ms = pygame.time.get_ticks()
+        for pos, datos in self.pentagonos.items():
+            vertices = datos["vertices"]
+            cx, cy = datos["centro"]
+            es_jugador = (pos == self.juego.pos_jugador)
+            es_visitada = (pos in self.juego.habitaciones_visitadas)
+            es_vecino = (pos in vecinos_jugador)
+
+            # Colores base según estado
+            if es_jugador:
+                color_fill = COLOR_PENT_PLAYER
+                color_border = COLOR_PENT_PLAYER_BORDER
+                pulse = 3 + int(2 * math.sin(time_ms * 0.006))
+                border_width = 3 + pulse
+            elif es_visitada or partida_terminada:
+                color_fill = COLOR_PENT_VISITED
+                color_border = COLOR_PENT_VISITED_BORDER
+                border_width = 2
+            else:
+                color_fill = COLOR_PENT_FOG
+                color_border = COLOR_PENT_FOG_BORDER
+                border_width = 2
+
+            # Resaltar si el cursor está encima y es vecina
+            if cueva_hover == pos and es_vecino and self.juego.vivo:
+                if self.modo_accion == "mover":
+                    color_border = COLOR_CYAN
+                elif self.modo_accion == "disparar":
+                    color_border = COLOR_RED
+                elif self.modo_accion == "lanzar":
+                    color_border = COLOR_ORANGE
+                border_width = 4
+
+            # Relleno y borde pentagonal
+            pygame.draw.polygon(self.screen, color_fill, vertices)
+            pygame.draw.polygon(self.screen, color_border, vertices, border_width)
+
+            # Coordenadas pequeñas de la cueva
+            txt_coord = self.font_small.render(f"{pos[0]},{pos[1]}", True, (90, 95, 125))
+            self.screen.blit(txt_coord, (cx - txt_coord.get_width() // 2, cy - 36))
+
+            # Contenido dentro del pentágono
+            if es_jugador:
+                avatar = "🤠💰" if self.juego.tiene_oro else "🧙‍♂️"
+                txt_avatar = self.font_emoji_large.render(avatar, True, COLOR_TEXT)
+                self.screen.blit(txt_avatar, (cx - txt_avatar.get_width() // 2, cy - txt_avatar.get_height() // 2 - 2))
+
+                # Percepciones dentro de la cueva del jugador
+                percepciones = self.juego.percibir()
+                iconos = []
+                if "Hedor" in percepciones: iconos.append("🦨")
+                if "Brisa" in percepciones: iconos.append("💨")
+                if "Brillo" in percepciones: iconos.append("✨")
+                if "Aleteo" in percepciones: iconos.append("🦇")
+                if "Crujido" in percepciones: iconos.append("💥")
+
+                if iconos:
+                    txt_perc = self.font_small.render(" ".join(iconos), True, COLOR_GOLD)
+                    self.screen.blit(txt_perc, (cx - txt_perc.get_width() // 2, cy + 16))
+
+            elif partida_terminada:
+                # Revelación de toda la cueva
+                if pos == self.juego.pos_wumpus:
+                    txt_item = self.font_emoji.render("👹" if self.juego.wumpus_vivo else "💀", True, COLOR_RED)
+                    lbl = self.font_small.render("WUMPUS", True, COLOR_RED)
+                elif pos == self.juego.pos_oro:
+                    txt_item = self.font_emoji.render("💰", True, COLOR_GOLD)
+                    lbl = self.font_small.render("ORO", True, COLOR_GOLD)
+                elif pos in self.juego.pos_pozos:
+                    txt_item = self.font_emoji.render("🕳️", True, COLOR_CYAN)
+                    lbl = self.font_small.render("POZO", True, COLOR_CYAN)
+                elif pos in self.juego.pos_murcielagos:
+                    txt_item = self.font_emoji.render("🦇", True, COLOR_PURPLE)
+                    lbl = self.font_small.render("MURCIÉLAGOS", True, COLOR_PURPLE)
+                elif pos == self.juego.pos_derrumbe:
+                    txt_item = self.font_emoji.render("🪨", True, COLOR_ORANGE)
+                    lbl = self.font_small.render("DERRUMBE", True, COLOR_ORANGE)
                 else:
-                    if pos in self.habitaciones_visitadas:
-                        celda = " . "
-                    else:
-                        celda = " ? "
-                fila_str += f" {celda} |"
-            print(fila_str)
-            print("  +" + "------+" * self.tamano)
-            
-        if not revelar_todo:
-            leyenda = "Leyenda: [J]=Jugador, [J+O]=Jugador con Oro, [.]=Visitada, [?]=Desconocida"
+                    txt_item = self.font_bold.render("·", True, COLOR_SUBTEXT)
+                    lbl = self.font_small.render("SEGURO", True, (80, 85, 110))
+
+                self.screen.blit(txt_item, (cx - txt_item.get_width() // 2, cy - 18))
+                self.screen.blit(lbl, (cx - lbl.get_width() // 2, cy + 12))
+
+            else:
+                if not es_visitada:
+                    txt_fog = self.font_bold.render("?", True, (65, 68, 90))
+                    self.screen.blit(txt_fog, (cx - txt_fog.get_width() // 2, cy - txt_fog.get_height() // 2))
+
+        # Ejes y Leyenda inferior del mapa
+        txt_mapa_guia = self.font_small.render("⬟ Mapa Pentagonal: Las cuevas son pentágonos y las líneas son los túneles", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_mapa_guia, (75, self.height - 35))
+
+    def _dibujar_panel_derecho(self):
+        panel_x = 640
+        panel_w = 415
+
+        # 1. Cabecera y Título
+        txt_titulo = self.font_title.render("🏹 EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
+        self.screen.blit(txt_titulo, (panel_x, 18))
+        txt_sub = self.font_small.render("Exploración táctica y supervivencia en cueva pentagonal", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_sub, (panel_x, 48))
+
+        # 2. Banner de Cacería Activa
+        banner_y = 74
+        if self.juego.modo_caceria and self.juego.wumpus_vivo:
+            dist = self.juego._distancia_al_jugador()
+            sufijo = "es" if dist > 1 else ""
+            banner_rect = pygame.Rect(panel_x, banner_y, panel_w, 36)
+            pygame.draw.rect(self.screen, COLOR_RED, banner_rect, border_radius=6)
+            txt_cac = self.font_bold.render(f"🚨 ¡¡WUMPUS EN CACERÍA!! Acechando a {dist} cueva{sufijo}", True, (20, 20, 30))
+            self.screen.blit(txt_cac, (panel_x + 14, banner_y + 8))
+            inv_y = banner_y + 46
         else:
-            leyenda = "Leyenda: [J]=Jugador, [W]=Wumpus Vivo, [MW]=Wumpus Muerto, [O]=Oro, [P]=Pozo, [M]=Murcielagos, [R]=Rocas/Derrumbe, [.]=Vacio"
-        print(f"  {leyenda}\n")
+            inv_y = banner_y
 
+        # 3. Tarjeta de Inventario y Estado
+        inv_rect = pygame.Rect(panel_x, inv_y, panel_w, 88)
+        pygame.draw.rect(self.screen, COLOR_PANEL, inv_rect, border_radius=8)
+        pygame.draw.rect(self.screen, COLOR_BORDER, inv_rect, 1, border_radius=8)
 
-def parse_comando(entrada):
-    """Interpreta la entrada del usuario de manera flexible y tolerante a espacios y comas."""
-    texto = entrada.strip().lower()
-    if not texto:
-        return None, None
+        txt_inv_titulo = self.font_bold.render("🎒 Inventario y Explorador", True, COLOR_GOLD)
+        self.screen.blit(txt_inv_titulo, (panel_x + 14, inv_y + 10))
 
-    numeros = re.findall(r'-?\d+', texto)
-    partes = texto.split()
-    cmd = partes[0]
+        txt_fl = self.font_normal.render(f"🏹 Flechas: {self.juego.flechas}", True, COLOR_TEXT)
+        self.screen.blit(txt_fl, (panel_x + 16, inv_y + 36))
 
-    if cmd in ["salir", "exit", "quit", "q"]:
-        return "salir", None
-    if cmd in ["ayuda", "help", "?"]:
-        return "ayuda", None
-    if cmd in ["mapa", "ver", "m"]:
-        return "mapa", None
-    if cmd in ["agarrar", "coger", "tomar", "grab", "oro"]:
-        return "agarrar", None
+        txt_pd = self.font_normal.render(f"🪨 Piedras: {self.juego.piedras}", True, COLOR_TEXT)
+        self.screen.blit(txt_pd, (panel_x + 160, inv_y + 36))
 
-    if cmd in ["mover", "ir", "mov"]:
-        if len(numeros) >= 2:
-            return "mover", (int(numeros[0]), int(numeros[1]))
-        return "mover_invalido", None
+        oro_str = "¡CONSEGUIDO! 🏆" if self.juego.tiene_oro else "No"
+        txt_oro = self.font_normal.render(f"💰 Oro: {oro_str}", True, COLOR_GOLD if self.juego.tiene_oro else COLOR_TEXT)
+        self.screen.blit(txt_oro, (panel_x + 16, inv_y + 60))
 
-    if cmd in ["disparar", "flecha", "disp", "shoot"]:
-        if len(numeros) >= 2:
-            return "disparar", (int(numeros[0]), int(numeros[1]))
-        return "disparar_invalido", None
+        txt_pos = self.font_normal.render(f"📍 Cueva actual: {self.juego.pos_jugador}", True, COLOR_CYAN)
+        self.screen.blit(txt_pos, (panel_x + 160, inv_y + 60))
 
-    if cmd in ["lanzar", "piedra", "tirar", "rock", "p", "l"]:
-        if len(numeros) >= 2:
-            return "lanzar", (int(numeros[0]), int(numeros[1]))
-        return "lanzar_invalido", None
+        # 4. Percepciones Sensoriales
+        perc_y = inv_y + 98
+        perc_rect = pygame.Rect(panel_x, perc_y, panel_w, 62)
+        pygame.draw.rect(self.screen, COLOR_PANEL, perc_rect, border_radius=8)
+        pygame.draw.rect(self.screen, COLOR_BORDER, perc_rect, 1, border_radius=8)
 
-    # Si el usuario solo escribió las coordenadas directamente (ej: '1,0' o '1 0')
-    if len(numeros) == 2 and len(partes) <= 2:
-        return "mover", (int(numeros[0]), int(numeros[1]))
+        txt_per_tit = self.font_bold.render("👂 Percepciones en esta cueva:", True, COLOR_TEXT)
+        self.screen.blit(txt_per_tit, (panel_x + 14, perc_y + 10))
 
-    return "desconocido", texto
-
-
-def imprimir_ayuda():
-    """Muestra la lista de comandos disponibles."""
-    print("\n--- COMANDOS DISPONIBLES ---")
-    print("  mover X,Y    (o 'X,Y')      : Desplazarte a una habitación adyacente.")
-    print("  disparar X,Y (o 'flecha X Y): Disparar la flecha en línea recta hacia esa dirección.")
-    print("  lanzar X,Y   (o 'piedra X Y): Lanzar una piedra a una habitación adyacente para tantear o distraer.")
-    print("  agarrar                     : Recoger el oro (¡activará la cacería del Wumpus!).")
-    print("  mapa                        : Mostrar el mapa de las habitaciones exploradas.")
-    print("  ayuda                       : Mostrar este mensaje de ayuda.")
-    print("  salir                       : Abandonar el juego.")
-    print("----------------------------\n")
-
-
-# === BUCLE DE JUEGO CLI ===
-def jugar_cli():
-    juego = MundoWumpus()
-    print("=========================================")
-    print("   BIENVENIDO AL MUNDO DEL WUMPUS (v3)   ")
-    print("=========================================")
-    print("Objetivo: Encuentra el oro, cógelo y regresa a salvo a (0, 0).")
-    print("¡CUIDADO! Al tomar el oro, el Wumpus comenzará a cazarte activamente.")
-    print("Escribe 'ayuda' en cualquier momento para ver los comandos.\n")
-    
-    juego.mostrar_mapa()
-
-    while juego.vivo:
-        # Comprobar victoria al inicio del turno en (0,0) con el oro
-        if juego.pos_jugador == (0, 0) and juego.tiene_oro:
-            print("\n*********************************************************")
-            print(" ¡¡¡FELICIDADES!!! Has escapado de la cueva con el oro. ")
-            print("                  ¡¡¡HAS GANADO!!!                       ")
-            print("*********************************************************")
-            juego.mostrar_mapa(revelar_todo=True)
-            break
-
-        print(f"Estás en la habitación: {juego.pos_jugador}")
-        percepciones = juego.percibir()
-        
+        percepciones = self.juego.percibir()
         if percepciones:
-            print(f"  > Percibes: {', '.join(percepciones)}")
+            txt_percs = self.font_bold.render("  •  " + "   •  ".join(percepciones), True, COLOR_GOLD)
         else:
-            print("  > No percibes nada inusual.")
-            
-        print(f"  > Habitaciones conectadas: {juego.grafo.get(juego.pos_jugador, [])}")
-        estado_caceria = " | [¡¡ALERTA: WUMPUS EN CACERÍA!!]" if juego.modo_caceria and juego.wumpus_vivo else ""
-        print(f"  > Flechas: {juego.flechas} | Piedras: {juego.piedras} | Oro: {'Sí' if juego.tiene_oro else 'No'}{estado_caceria}")
-        
-        entrada = input("\n¿Qué deseas hacer?: ")
-        accion, args = parse_comando(entrada)
-        
-        if accion is None:
-            continue
-            
-        if accion == "mover":
-            juego.mover(args)
-            if juego.vivo:
-                juego.mostrar_mapa()
-        elif accion == "mover_invalido":
-            print("\n[!] Formato incorrecto. Especifica las coordenadas. Ejemplos: 'mover 1,0' o 'mover 1 0'.")
-        elif accion == "disparar":
-            juego.disparar(args)
-        elif accion == "disparar_invalido":
-            print("\n[!] Formato incorrecto. Especifica hacia dónde disparar. Ejemplo: 'disparar 1,0'.")
-        elif accion == "lanzar":
-            juego.lanzar_piedra(args)
-        elif accion == "lanzar_invalido":
-            print("\n[!] Formato incorrecto. Especifica a qué habitación lanzar la piedra. Ejemplo: 'lanzar 1,0'.")
-        elif accion == "agarrar":
-            juego.agarrar()
-        elif accion == "mapa":
-            juego.mostrar_mapa()
-        elif accion == "ayuda":
-            imprimir_ayuda()
-        elif accion == "salir":
-            print("\nHas abandonado la cueva cobardemente.")
-            juego.mostrar_mapa(revelar_todo=True)
-            break
-        else:
-            print(f"\n[!] Comando '{args}' no reconocido. Escribe 'ayuda' para ver las opciones disponibles.")
+            txt_percs = self.font_normal.render("Silencio y calma. No percibes nada inusual.", True, (110, 115, 140))
+        self.screen.blit(txt_percs, (panel_x + 14, perc_y + 34))
 
-    if not juego.vivo:
-        print("\nHas muerto en la oscuridad de la cueva.")
-        juego.mostrar_mapa(revelar_todo=True)
+        # 5. Botones de Acción
+        btn_y = perc_y + 72
+        self.btn_disparar_rect = pygame.Rect(panel_x, btn_y, 130, 36)
+        self.btn_lanzar_rect = pygame.Rect(panel_x + 140, btn_y, 130, 36)
+        self.btn_agarrar_rect = pygame.Rect(panel_x + 280, btn_y, 135, 36)
+        self.btn_reiniciar_rect = pygame.Rect(panel_x, btn_y + 44, panel_w, 32)
+
+        # Colores dinámicos según modo
+        c_disp = COLOR_RED if self.modo_accion == "disparar" else (60, 65, 85)
+        c_lanz = COLOR_ORANGE if self.modo_accion == "lanzar" else (60, 65, 85)
+        c_agar = COLOR_GREEN if self.juego.pos_jugador == self.juego.pos_oro and not self.juego.tiene_oro else (50, 75, 60)
+
+        pygame.draw.rect(self.screen, c_disp, self.btn_disparar_rect, border_radius=6)
+        pygame.draw.rect(self.screen, c_lanz, self.btn_lanzar_rect, border_radius=6)
+        pygame.draw.rect(self.screen, c_agar, self.btn_agarrar_rect, border_radius=6)
+        pygame.draw.rect(self.screen, (45, 48, 65), self.btn_reiniciar_rect, border_radius=6)
+
+        txt_b_disp = self.font_bold.render("🏹 Disparar (F)", True, (20, 20, 30) if self.modo_accion == "disparar" else COLOR_TEXT)
+        txt_b_lanz = self.font_bold.render("🪨 Piedra (P)", True, (20, 20, 30) if self.modo_accion == "lanzar" else COLOR_TEXT)
+        txt_b_agar = self.font_bold.render("💰 Agarrar (G)", True, (20, 20, 30) if c_agar == COLOR_GREEN else COLOR_TEXT)
+        txt_b_rein = self.font_bold.render("🔄 Nueva Cueva Aleatoria (R)", True, COLOR_TEXT)
+
+        self.screen.blit(txt_b_disp, (panel_x + 14, btn_y + 9))
+        self.screen.blit(txt_b_lanz, (panel_x + 154, btn_y + 9))
+        self.screen.blit(txt_b_agar, (panel_x + 292, btn_y + 9))
+        self.screen.blit(txt_b_rein, (panel_x + 105, btn_y + 51))
+
+        # 6. Bitácora de Eventos
+        log_y = btn_y + 88
+        log_h = self.height - log_y - 45
+        log_rect = pygame.Rect(panel_x, log_y, panel_w, log_h)
+        pygame.draw.rect(self.screen, (17, 17, 27), log_rect, border_radius=8)
+        pygame.draw.rect(self.screen, COLOR_BORDER, log_rect, 1, border_radius=8)
+
+        txt_log_tit = self.font_bold.render("📜 Bitácora de la Aventura", True, COLOR_GOLD)
+        self.screen.blit(txt_log_tit, (panel_x + 14, log_y + 8))
+
+        line_y = log_y + 32
+        for msg, tipo in self.log_mensajes[-7:]:
+            if tipo == "peligro" or tipo == "muerte":
+                c = COLOR_RED
+            elif tipo == "victoria":
+                c = COLOR_GREEN
+            elif tipo == "alerta":
+                c = COLOR_GOLD
+            elif tipo == "pista":
+                c = COLOR_CYAN
+            elif tipo == "derrumbe":
+                c = COLOR_ORANGE
+            elif tipo == "murcielago":
+                c = COLOR_PURPLE
+            else:
+                c = COLOR_TEXT
+
+            txt_line = self.font_normal.render(f"• {msg}", True, c)
+            self.screen.blit(txt_line, (panel_x + 14, line_y))
+            line_y += 20
+
+        # 7. Controles y atajos al pie
+        txt_ctrls = self.font_small.render("Atajos: WASD / Flechas para mover | Clic para interactuar | Esc para cancelar", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_ctrls, (panel_x, self.height - 28))
+
+    def _dibujar_estado_final(self):
+        if self.juego.pos_jugador == (0, 0) and self.juego.tiene_oro:
+            banner_rect = pygame.Rect(60, 20, 520, 50)
+            pygame.draw.rect(self.screen, (30, 80, 50), banner_rect, border_radius=8)
+            pygame.draw.rect(self.screen, COLOR_GREEN, banner_rect, 2, border_radius=8)
+            txt_vic = self.font_bold.render("🏆 ¡¡HAS ESCAPADO CON EL ORO!! ¡¡VICTORIA!! (Pulsa R)", True, COLOR_GREEN)
+            self.screen.blit(txt_vic, (banner_rect.centerx - txt_vic.get_width() // 2, banner_rect.centery - txt_vic.get_height() // 2))
+
+        elif not self.juego.vivo:
+            banner_rect = pygame.Rect(60, 20, 520, 50)
+            pygame.draw.rect(self.screen, (70, 20, 30), banner_rect, border_radius=8)
+            pygame.draw.rect(self.screen, COLOR_RED, banner_rect, 2, border_radius=8)
+            txt_der = self.font_bold.render("💀 HAS MUERTO EN LA CUEVA. Cueva revelada. (Pulsa R)", True, COLOR_RED)
+            self.screen.blit(txt_der, (banner_rect.centerx - txt_der.get_width() // 2, banner_rect.centery - txt_der.get_height() // 2))
+
+
+def main():
+    app = WumpusPygameApp()
+    app.run()
 
 
 if __name__ == "__main__":
-    import sys
-    if "--gui" in sys.argv:
-        from gui import iniciar_gui
-        iniciar_gui()
-    else:
-        jugar_cli()
+    main()

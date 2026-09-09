@@ -54,7 +54,7 @@ Al entrar a cada habitación, recibirás pistas del entorno:
 
 ## 🚀 Requisitos e Instalación
 
-No se requieren librerías externas; utiliza únicamente la biblioteca estándar de Python:
+El juego funciona con **Pygame** (`pygame-ce`), con todo el código unificado en un solo archivo:
 
 ```bash
 # Clonar el repositorio
@@ -63,12 +63,10 @@ git clone https://github.com/BrunoJuarez22/wumpus.git
 # Entrar al directorio
 cd wumpus
 
-# Ejecutar con Interfaz Gráfica (GUI)
-python gui.py
-# o también:
-python wunpus.py --gui
+# Instalar Pygame (si aún no lo tienes)
+pip install pygame-ce
 
-# Ejecutar en Modo Terminal (CLI)
+# Ejecutar el juego
 python wunpus.py
 ```
 

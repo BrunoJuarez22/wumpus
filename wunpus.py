@@ -386,8 +386,9 @@ class WumpusPygameApp:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        self.font_title = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 22, bold=True)
-        self.font_bold = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 15, bold=True)
+        self.font_title = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 20, bold=True)
+        self.font_bold = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 14, bold=True)
+        self.font_btn = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13, bold=True)
         self.font_normal = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13)
         self.font_small = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 11)
         self.font_emoji = pygame.font.SysFont(["segoe ui emoji", "segoe ui symbol", "arial"], 20)
@@ -398,6 +399,11 @@ class WumpusPygameApp:
         self.juego = None
         self.coords_cuevas = {}
         self.radio_cueva = 22
+
+        self.mostrar_menu_mecanicas = False
+        self.btn_mecanicas_rect = None
+        self.btn_cerrar_mecanicas_rect = None
+        self.dropdown_mecanicas_rect = None
 
         self._calcular_coordenadas_vertices()
         self.nueva_partida()
@@ -486,6 +492,21 @@ class WumpusPygameApp:
                 self.running = False
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 1. Clic en botón de menú desplegable de mecánicas
+                if self.btn_mecanicas_rect and self.btn_mecanicas_rect.collidepoint(event.pos):
+                    self.mostrar_menu_mecanicas = not self.mostrar_menu_mecanicas
+                    continue
+
+                # 2. Interacción exclusiva si el menú está desplegado
+                if self.mostrar_menu_mecanicas:
+                    if self.btn_cerrar_mecanicas_rect and self.btn_cerrar_mecanicas_rect.collidepoint(event.pos):
+                        self.mostrar_menu_mecanicas = False
+                    elif self.dropdown_mecanicas_rect and self.dropdown_mecanicas_rect.collidepoint(event.pos):
+                        pass
+                    else:
+                        self.mostrar_menu_mecanicas = False
+                    continue
+
                 # Comprobar clics en botones de acción
                 if self.btn_disparar_rect.collidepoint(event.pos):
                     if self.juego.flechas > 0 and self.juego.vivo:
@@ -521,6 +542,18 @@ class WumpusPygameApp:
                     self.interactuar_con_cueva(cueva_hover)
 
             elif event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_m, pygame.K_h):
+                    self.mostrar_menu_mecanicas = not self.mostrar_menu_mecanicas
+                    continue
+
+                if event.key == pygame.K_ESCAPE:
+                    if self.mostrar_menu_mecanicas:
+                        self.mostrar_menu_mecanicas = False
+                        continue
+                    else:
+                        self.modo_accion = "mover"
+                        continue
+
                 vecinos = self.juego.grafo.get(self.juego.pos_jugador, [])
                 if event.key == pygame.K_1 and len(vecinos) >= 1:
                     self.interactuar_con_cueva(vecinos[0])
@@ -539,14 +572,14 @@ class WumpusPygameApp:
                         self.juego.agarrar()
                 elif event.key == pygame.K_r:
                     self.nueva_partida()
-                elif event.key == pygame.K_ESCAPE:
-                    self.modo_accion = "mover"
 
     def _render(self):
         self.screen.fill(COLOR_BG)
         self._dibujar_red_pentagonal()
         self._dibujar_panel_derecho()
         self._dibujar_estado_final()
+        if self.mostrar_menu_mecanicas:
+            self._dibujar_menu_mecanicas()
         pygame.display.flip()
 
     def _dibujar_red_pentagonal(self):
@@ -671,11 +704,24 @@ class WumpusPygameApp:
         panel_x = 655
         panel_w = 415
 
-        # 1. Cabecera
-        txt_titulo = self.font_title.render("🏹 EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
+        # 1. Cabecera y Botón de Nuevas Mecánicas
+        txt_titulo = self.font_title.render("EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
         self.screen.blit(txt_titulo, (panel_x, 16))
         txt_sub = self.font_small.render("Grafo de pentágonos pegados (Dodecaedro de 20 cuevas)", True, COLOR_SUBTEXT)
         self.screen.blit(txt_sub, (panel_x, 44))
+
+        # Botón de menú desplegable de mecánicas
+        self.btn_mecanicas_rect = pygame.Rect(panel_x + panel_w - 150, 14, 150, 26)
+        mouse_pos = pygame.mouse.get_pos()
+        es_hover_mec = self.btn_mecanicas_rect.collidepoint(mouse_pos)
+        c_bg_mec = (55, 65, 95) if (es_hover_mec or self.mostrar_menu_mecanicas) else (40, 45, 68)
+        pygame.draw.rect(self.screen, c_bg_mec, self.btn_mecanicas_rect, border_radius=6)
+        pygame.draw.rect(self.screen, COLOR_GOLD, self.btn_mecanicas_rect, 1, border_radius=6)
+
+        simbolo = "▲" if self.mostrar_menu_mecanicas else "▼"
+        txt_btn_mec = self.font_btn.render(f"Nuevas Mecánicas {simbolo}", True, COLOR_GOLD)
+        self.screen.blit(txt_btn_mec, (self.btn_mecanicas_rect.centerx - txt_btn_mec.get_width() // 2,
+                                       self.btn_mecanicas_rect.centery - txt_btn_mec.get_height() // 2))
 
         # 2. Banner de Cacería Activa
         banner_y = 68
@@ -824,6 +870,82 @@ class WumpusPygameApp:
             pygame.draw.rect(self.screen, COLOR_RED, banner_rect, 2, border_radius=8)
             txt_der = self.font_bold.render("💀 HAS MUERTO EN LA CUEVA. Cueva revelada. (Pulsa R)", True, COLOR_RED)
             self.screen.blit(txt_der, (banner_rect.centerx - txt_der.get_width() // 2, banner_rect.centery - txt_der.get_height() // 2))
+
+    def _dibujar_menu_mecanicas(self):
+        box_x = 635
+        box_y = 48
+        box_w = 440
+        box_h = 575
+        self.dropdown_mecanicas_rect = pygame.Rect(box_x, box_y, box_w, box_h)
+
+        # Fondo con sombra y borde dorado
+        pygame.draw.rect(self.screen, (20, 22, 34), self.dropdown_mecanicas_rect, border_radius=10)
+        pygame.draw.rect(self.screen, COLOR_GOLD, self.dropdown_mecanicas_rect, 2, border_radius=10)
+
+        # Cabecera del menú
+        header_rect = pygame.Rect(box_x, box_y, box_w, 36)
+        pygame.draw.rect(self.screen, (32, 35, 52), header_rect, border_top_left_radius=10, border_top_right_radius=10)
+        pygame.draw.rect(self.screen, COLOR_BORDER, header_rect, 1, border_top_left_radius=10, border_top_right_radius=10)
+        txt_head = self.font_bold.render("NOVEDADES VS. WUMPUS CLASICO (1972)", True, COLOR_GOLD)
+        self.screen.blit(txt_head, (box_x + 14, box_y + 9))
+
+        # Botón de cerrar [X]
+        self.btn_cerrar_mecanicas_rect = pygame.Rect(box_x + box_w - 30, box_y + 6, 24, 24)
+        mouse_pos = pygame.mouse.get_pos()
+        es_hover_x = self.btn_cerrar_mecanicas_rect.collidepoint(mouse_pos)
+        c_bg_x = (80, 30, 40) if es_hover_x else (50, 20, 30)
+        pygame.draw.rect(self.screen, c_bg_x, self.btn_cerrar_mecanicas_rect, border_radius=4)
+        pygame.draw.rect(self.screen, COLOR_RED, self.btn_cerrar_mecanicas_rect, 1, border_radius=4)
+        txt_x = self.font_bold.render("X", True, COLOR_RED)
+        self.screen.blit(txt_x, (self.btn_cerrar_mecanicas_rect.centerx - txt_x.get_width() // 2,
+                                 self.btn_cerrar_mecanicas_rect.centery - txt_x.get_height() // 2))
+
+        # Lista de nuevas mecánicas
+        mecanicas = [
+            ("1. Modo Cacería del Wumpus", COLOR_RED, [
+                "• Original: El Wumpus era estático y solo se movía al fallar flechas.",
+                "• Nuevo: ¡Al coger el Oro, el Wumpus despierta e inicia cacería!",
+                "  Te persigue activamente por el grafo cada 2 turnos para devorarte.",
+                "  Debes huir a tiempo de regreso hasta la Cueva 0 para escapar."
+            ]),
+            ("2. Lanzamiento de Piedras (3 en bolsa)", COLOR_CYAN, [
+                "• Original: Solo contabas con una flecha para disparar a ciegas.",
+                "• Nuevo: Arroja piedras a cuevas contiguas ('P') para tantear riesgos:",
+                "    - Eco de chapoteo (Splash): Pozo mortal sin fondo.",
+                "    - Rugido furioso: Golpeas al Wumpus, huye y retrasa la cacería.",
+                "    - Chillidos y aleteo: Nido de murciélagos gigantes.",
+                "    - Crujido de piedra: Techo inestable a punto de desplomarse."
+            ]),
+            ("3. Derrumbe Dinámico de Túneles", COLOR_ORANGE, [
+                "• Original: La red de 30 túneles del dodecaedro era inalterable.",
+                "• Nuevo: Hay una cueva inestable (percepción 'Crujido'). Al pisarla,",
+                "  un derrumbe violento sella un túnel para siempre ('[X]'),",
+                "  obligándote a buscar rutas alternativas en el grafo."
+            ]),
+            ("4. Garantía de Solubilidad con BFS", COLOR_GREEN, [
+                "• Original: Los pozos al azar podían bloquear la cueva inicial.",
+                "• Nuevo: Búsqueda en Anchura (BFS) valida matemáticamente que",
+                "  siempre exista un camino seguro transitable de ida y vuelta."
+            ]),
+            ("5. Niebla de Guerra y Mosaico Pentagonal", COLOR_GOLD, [
+                "• Original: Aventura clásica puramente en texto en terminal ciega.",
+                "• Nuevo: Mosaico gráfico de pentágonos pegados con iluminación,",
+                "  percepciones en tiempo real y revelación total al terminar."
+            ])
+        ]
+
+        curr_y = box_y + 46
+        for titulo, col_tit, lineas in mecanicas:
+            self.screen.blit(self.font_bold.render(titulo, True, col_tit), (box_x + 14, curr_y))
+            curr_y += 18
+            for lin in lineas:
+                self.screen.blit(self.font_normal.render(lin, True, COLOR_TEXT), (box_x + 20, curr_y))
+                curr_y += 16
+            curr_y += 6
+
+        # Pie de página
+        txt_foot = self.font_small.render("Haz clic en [X], en el botón o presiona ESC / M para cerrar", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_foot, (box_x + box_w // 2 - txt_foot.get_width() // 2, box_y + box_h - 22))
 
 
 def main():

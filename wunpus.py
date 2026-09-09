@@ -417,6 +417,8 @@ class MundoWumpus:
             algo_tomado = True
             print("\nHas tomado el cofre de oro (+1000 pts).")
             print("Ahora debes regresar a la Cueva 1 para escapar.")
+            if self.tiene_brujula:
+                print("(La brújula ahora te señala el camino de vuelta a la Cueva 1)")
             
             if self.wumpus_vivo:
                 self.modo_caceria = True
@@ -567,17 +569,17 @@ class MundoWumpus:
         if percepciones:
             for p in percepciones:
                 if p == "Hedor":
-                    print("  * Hedor insoportable: El Wumpus está cerca.")
+                    print("  * Hedor insoportable: El Wumpus está cerca. (Puedes usar 'disparar N' o 'lanzar N')")
                 elif p == "Brisa":
-                    print("  * Brisa fría y húmeda: Sientes la corriente de un pozo cercano.")
+                    print("  * Brisa fría y húmeda: Hay un pozo cercano. (Puedes usar 'lanzar N' con una piedra)")
                 elif p == "Aleteo":
                     print("  * Aleteo distante: Murciélagos gigantes habitan cerca.")
                 elif p == "Crujido":
                     print("  * Crujido de piedra: Techo inestable a punto de desplomarse.")
                 elif p == "Brillo":
-                    print("  * Brillo resplandeciente: El cofre de oro está en esta cueva.")
+                    print("  * Brillo resplandeciente: El cofre de oro está en esta cueva. (Escribe 'tomar' para recogerlo)")
                 elif p == "Destello metálico":
-                    print("  * Destello metálico: Hay una brújula antigua en el suelo de esta cueva.")
+                    print("  * Destello metálico: Hay una brújula antigua en el suelo. (Escribe 'tomar' para recogerla)")
         else:
             print("  * Silencio. No percibes peligros contiguos.")
 
@@ -589,8 +591,20 @@ class MundoWumpus:
         lista_vecinos = ", ".join(f"Cueva {v}" for v in vecinos)
         print(f"\n[Túneles disponibles]: Puedes moverte a: {lista_vecinos}")
 
-        estado_caceria = "\n  [Alerta: El Wumpus está despierto y te está buscando]" if self.modo_caceria and self.wumpus_vivo else ""
-        estado_distraccion = f"\n  [El Wumpus está ocupado comiendo el cebo ({self.distraccion_wumpus} turno(s) restante(s))]" if self.distraccion_wumpus > 0 and self.wumpus_vivo else ""
+        if self.modo_caceria and self.wumpus_vivo:
+            if self.distraccion_wumpus > 0:
+                estado_distraccion = f"\n  [El Wumpus está ocupado comiendo el cebo ({self.distraccion_wumpus} turno(s) restante(s))]"
+                estado_caceria = ""
+            elif self.cebos > 0:
+                estado_distraccion = ""
+                estado_caceria = "\n  [Alerta: El Wumpus te está buscando. Puedes usar 'cebo N' para distraerlo 2 turnos]"
+            else:
+                estado_distraccion = ""
+                estado_caceria = "\n  [Alerta: El Wumpus te está buscando. Debes regresar a la Cueva 1 para escapar]"
+        else:
+            estado_caceria = ""
+            estado_distraccion = ""
+
         brujula_txt = "Sí" if self.tiene_brujula else "No"
         print(f"[Inventario]: Flechas: {self.flechas} | Piedras: {self.piedras} | Cebos: {self.cebos} | Brújula: {brujula_txt} | Oro: {'Sí' if self.tiene_oro else 'No'}{estado_caceria}{estado_distraccion}")
         print("=" * 56)
@@ -802,7 +816,16 @@ if __name__ == "__main__":
 
         juego.describir_cueva()
 
-        entrada = input("\n¿Qué deseas hacer? (ej: 'mover 2' o simplemente '2'): ")
+        if juego.pos_jugador == juego.pos_oro and not juego.tiene_oro:
+            prompt_texto = "\n¿Qué deseas hacer? (escribe 'tomar' para el oro o número de cueva para moverte): "
+        elif juego.pos_jugador == juego.pos_brujula and not juego.tiene_brujula:
+            prompt_texto = "\n¿Qué deseas hacer? (escribe 'tomar' para la brújula o número de cueva para moverte): "
+        elif juego.modo_caceria and juego.wumpus_vivo and juego.cebos > 0:
+            prompt_texto = "\n¿Qué deseas hacer? (ej: 'mover 2' o 'cebo N' para distraer): "
+        else:
+            prompt_texto = "\n¿Qué deseas hacer? (ej: 'mover 2' o simplemente '2'): "
+
+        entrada = input(prompt_texto)
         accion, args = parse_comando(entrada)
 
         if accion is None:

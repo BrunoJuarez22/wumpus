@@ -13,7 +13,7 @@ def imprimir_novedades():
      Te persigue activamente por el mapa cada 2 turnos para devorarte.
      Debes huir a tiempo de regreso hasta la Cueva 1 para escapar.
 
-2. Lanzamiento de Piedras (3 en bolsa):
+2. Lanzamiento de Piedras (4 en bolsa):
    * Original: Solo contabas con una flecha para disparar a ciegas.
    * Nuevo: Arroja piedras a cuevas contiguas ('lanzar X' o 'p X') para tantear riesgos:
        - Eco de chapoteo (Splash): Pozo sin fondo.
@@ -36,7 +36,7 @@ def imprimir_novedades():
 
 
 class MundoWumpus:
-    def __init__(self, tamano=4):
+    def __init__(self, tamano=5):
         self.tamano = tamano
         self.total_cuevas = tamano * tamano
         self.grafo = {}
@@ -57,7 +57,7 @@ class MundoWumpus:
         self.modo_caceria = False
         self.turnos_caceria = 0
         self.flechas = 1
-        self.piedras = 3
+        self.piedras = 4 if self.total_cuevas >= 25 else 3
         self.habitaciones_visitadas = {self.pos_jugador}
         
         self.movimientos_totales = 0
@@ -142,9 +142,12 @@ class MundoWumpus:
             self.pos_oro = random.choice(cuevas)
             cuevas.remove(self.pos_oro)
             
-            pos_bat = random.choice(cuevas)
-            self.pos_murcielagos = [pos_bat]
-            cuevas.remove(pos_bat)
+            num_bats = 2 if self.total_cuevas >= 25 else 1
+            self.pos_murcielagos = []
+            for _ in range(num_bats):
+                bat = random.choice(cuevas)
+                self.pos_murcielagos.append(bat)
+                cuevas.remove(bat)
             
             self.pos_derrumbe = random.choice(cuevas)
             cuevas.remove(self.pos_derrumbe)
@@ -262,11 +265,14 @@ class MundoWumpus:
             posibles = [c for c in range(1, self.total_cuevas + 1) if c != self.pos_jugador]
             destino = random.choice(posibles)
             print(f"Te dejan caer en la Cueva {destino}.")
+            bat_actual = self.pos_jugador
             self.pos_jugador = destino
             self.habitaciones_visitadas.add(destino)
             
-            libres = [c for c in posibles if c != destino and c != 1]
-            self.pos_murcielagos = [random.choice(libres)]
+            libres = [c for c in posibles if c != destino and c != 1 and c not in self.pos_murcielagos]
+            if libres:
+                self.pos_murcielagos.remove(bat_actual)
+                self.pos_murcielagos.append(random.choice(libres))
             
             self.verificar_estado()
 

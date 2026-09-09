@@ -4,7 +4,7 @@
 Archivo analizado: wunpus.py
 Lenguaje: Python 3
 Estructura de datos principal: Grafo no dirigido con Lista de Adyacencia (Diccionario {cueva: [vecinos]})
-Identificación de cuevas: Números enteros del 1 al 16 (formato [N:?])
+Identificación de cuevas: Números enteros del 1 al 25 (formato [N:?])
 Algoritmos clave: Búsqueda en Anchura (BFS), Raycasting en línea recta, Análisis de texto (Regex)
 Sistema de puntuación: Puntuación base acumulativa + Multiplicador de eficiencia de movimientos
 ================================================================================
@@ -18,7 +18,7 @@ Sistema de puntuación: Puntuación base acumulativa + Multiplicador de eficienc
   Imprime en consola el panel con las novedades y reglas añadidas respecto
   a la versión original del juego de 1972:
   - Modo Cacería del Wumpus.
-  - Lanzamiento de Piedras (3 en bolsa).
+  - Lanzamiento de Piedras (4 en bolsa).
   - Partida Siempre Ganable.
   - Sistema de Puntuación y Eficiencia de movimientos.
 Funcionamiento en programación:
@@ -35,8 +35,8 @@ las reglas del entorno y la lógica de interacción del jugador y criaturas.
 ¿Qué hace?
   Es el constructor de la clase. Inicializa todas las variables de partida.
 Funcionamiento en programación:
-  - `self.tamano`: Ancho y alto de la cuadrícula (4).
-  - `self.total_cuevas`: Total de cuevas (16).
+  - `self.tamano`: Ancho y alto de la cuadrícula (5).
+  - `self.total_cuevas`: Total de cuevas (25).
   - `self.grafo`: Diccionario `{cueva_id: [cuevas_vecinas]}`.
   - `self.pos_jugador`: Cueva actual del jugador (inicia siempre en la Cueva 1).
   - `self.pos_wumpus`, `self.pos_oro`: Identificador entero de cueva.
@@ -61,7 +61,7 @@ Funcionamiento en programación:
 2.2. _cueva_a_xy(self, c) y _xy_a_cueva(self, x, y)
 ¿Qué hace?
   Funciones auxiliares matemáticas de conversión bidireccional entre el número
-  de cueva (1..16) y sus coordenadas cartesianas (x, y) en la cuadrícula 4x4.
+  de cueva (1..25) y sus coordenadas cartesianas (x, y) en la cuadrícula 5x5.
 Funcionamiento en programación:
   - `x = (c - 1) % tamano`, `y = (c - 1) // tamano`.
   - `c = y * tamano + x + 1`.
@@ -69,9 +69,9 @@ Funcionamiento en programación:
 
 2.3. construir_grafo(self)
 ¿Qué hace?
-  Genera la topología de la cueva conectando las 16 cuevas mediante pasadizos.
+  Genera la topología de la cueva conectando las 25 cuevas mediante pasadizos.
 Funcionamiento en programación:
-  - Para cada cueva del 1 al 16 calcula sus coordenadas y agrega a su lista de
+  - Para cada cueva del 1 al 25 calcula sus coordenadas y agrega a su lista de
     vecinos las cuevas contiguas válidas (norte, sur, este, oeste).
   - Almacena el resultado en `self.grafo[c]`.
 
@@ -95,7 +95,7 @@ Funcionamiento en programación:
 
 2.6. inicializar_elementos(self)
 ¿Qué hace?
-  Ubica aleatoriamente los elementos en las cuevas 2 a 16, validando que la partida
+  Ubica aleatoriamente los elementos en las cuevas 2 a 25, validando que la partida
   sea 100% ganable antes de iniciar.
 
 

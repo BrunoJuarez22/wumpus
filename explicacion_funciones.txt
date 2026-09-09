@@ -13,7 +13,7 @@ Sistema de puntuación: Puntuación base acumulativa + Multiplicador de eficienc
 1. FUNCIONES GENERALES
 --------------------------------------------------------------------------------
 
-1.1. imprimir_mecanicas()
+1.1. imprimir_novedades()
 ¿Qué hace?
   Imprime en consola el panel con las novedades y reglas añadidas respecto
   a la versión original del juego de 1972:
@@ -46,9 +46,9 @@ Funcionamiento en programación:
   - `self.derrumbe_ocurrido`: Booleano para activar el derrumbe solo una vez.
   - `self.bloqueos`: Conjunto `{(u, v)}` con los túneles sellados por rocas.
   - `self.vivo`: Booleano que indica si el jugador sigue con vida.
-  - `self.tiene_oro`: Booleano que indica si recogió el cofre de oro.
+  - `self.tiene_oro`: Booleano que indica si tomó el cofre de oro.
   - `self.wumpus_vivo`: Booleano de estado del monstruo.
-  - `self.modo_caceria`: Booleano que activa la persecución tras coger el oro.
+  - `self.modo_caceria`: Booleano que activa la persecución tras tomar el oro.
   - `self.turnos_caceria`: Contador de turnos para regular la velocidad del Wumpus.
   - `self.flechas`: Cantidad de flechas disponibles (inicia con 1).
   - `self.piedras`: Cantidad de piedras para tantear (inicia con 3).
@@ -145,9 +145,9 @@ Funcionamiento en programación:
   o descubrir rocas inestables (+100 pts de exploración).
 
 
-2.14. agarrar(self)
+2.14. tomar(self) / agarrar(self)
 ¿Qué hace?
-  Recoge el cofre de oro si el explorador está en la cueva correcta (+1000 pts), despertando
+  Toma el cofre de oro si el explorador está en la cueva correcta (+1000 pts), despertando
   de inmediato al Wumpus en Modo Cacería.
 
 
@@ -199,7 +199,7 @@ Funcionamiento en programación:
 Funcionamiento en programación:
   - Si el usuario escribe solo un número (ej: `2`), lo interpreta directamente como `mover 2`.
   - Reconoce verbos y abreviaturas: `mover 2`, `m 2`, `disparar 2`, `f 2`, `lanzar 2`, `p 2`,
-    `agarrar`, `oro`, `mapa`, `m`, `mecanicas`, `ayuda`, `salir`.
+    `agarrar`, `oro`, `mapa`, `m`, `novedades`, `ayuda`, `salir`.
 
 
 3.2. imprimir_ayuda()

@@ -1,11 +1,10 @@
 import random
-import re
 import math
 import sys
-from collections import deque
+from collections import deque, defaultdict
 import pygame
 
-COLOR_BG = (24, 24, 37)
+COLOR_BG = (20, 20, 32)
 COLOR_PANEL = (30, 30, 46)
 COLOR_BORDER = (49, 50, 68)
 COLOR_TEXT = (205, 214, 244)
@@ -17,24 +16,27 @@ COLOR_CYAN = (137, 220, 235)
 COLOR_PURPLE = (203, 166, 247)
 COLOR_ORANGE = (250, 179, 135)
 
-COLOR_TUNNEL = (45, 47, 65)
-COLOR_TUNNEL_INNER = (65, 68, 95)
-COLOR_PENT_FOG = (17, 17, 27)
-COLOR_PENT_FOG_BORDER = (35, 36, 52)
-COLOR_PENT_VISITED = (40, 42, 60)
-COLOR_PENT_VISITED_BORDER = (75, 78, 108)
-COLOR_PENT_PLAYER = (35, 60, 95)
-COLOR_PENT_PLAYER_BORDER = (137, 180, 250)
+COLOR_FACE = (26, 27, 42)
+COLOR_FACE_BORDER = (38, 40, 60)
+COLOR_TUNNEL = (50, 53, 76)
+COLOR_TUNNEL_INNER = (72, 76, 108)
+
+COLOR_NODE_FOG = (16, 16, 26)
+COLOR_NODE_FOG_BORDER = (35, 36, 52)
+COLOR_NODE_VISITED = (40, 43, 62)
+COLOR_NODE_VISITED_BORDER = (80, 84, 118)
+COLOR_NODE_PLAYER = (35, 65, 105)
+COLOR_NODE_PLAYER_BORDER = (137, 180, 250)
 
 
-class MundoWumpus:
-    def __init__(self, tamano=4, callback_log=None):
-        self.tamano = tamano
+class MundoWumpusDodecaedro:
+    def __init__(self, callback_log=None):
         self.callback_log = callback_log
-        self.grafo = {}
-        self.construir_grafo()
+        self.grafo = defaultdict(list)
+        self.caras_pentagonales = []
+        self.construir_grafo_dodecaedro()
         
-        self.pos_jugador = (0, 0)
+        self.pos_jugador = 0
         self.pos_wumpus = None
         self.pos_oro = None
         self.pos_pozos = []
@@ -60,15 +62,46 @@ class MundoWumpus:
         else:
             print(mensaje)
 
-    def construir_grafo(self):
-        for x in range(self.tamano):
-            for y in range(self.tamano):
-                vecinos = []
-                if x > 0: vecinos.append((x - 1, y))
-                if x < self.tamano - 1: vecinos.append((x + 1, y))
-                if y > 0: vecinos.append((x, y - 1))
-                if y < self.tamano - 1: vecinos.append((x, y + 1))
-                self.grafo[(x, y)] = vecinos
+    def construir_grafo_dodecaedro(self):
+        self.grafo.clear()
+        
+        # Central pentagon: 0, 1, 2, 3, 4
+        for i in range(5):
+            self._agregar_arista(i, (i + 1) % 5)
+            self._agregar_arista(i, i + 5)
+            
+        # Middle ring 1 (5..9) connects to Middle ring 2 (10..14)
+        for i in range(5):
+            r1 = i + 5
+            r2_a = 10 + i
+            r2_b = 10 + (i - 1) % 5
+            self._agregar_arista(r1, r2_a)
+            self._agregar_arista(r1, r2_b)
+            
+        # Middle ring 2 (10..14) connects to Outer ring (15..19)
+        for i in range(5):
+            self._agregar_arista(10 + i, 15 + i)
+            
+        # Outer pentagon: 15, 16, 17, 18, 19
+        for i in range(5):
+            self._agregar_arista(15 + i, 15 + (i + 1) % 5)
+            
+        # Definir las 11 caras pentagonales visibles
+        self.caras_pentagonales = []
+        # Cara 0 (Centro)
+        self.caras_pentagonales.append([0, 1, 2, 3, 4])
+        # Caras 1..5 (Anillo medio A)
+        for i in range(5):
+            self.caras_pentagonales.append([i, (i + 1) % 5, 5 + (i + 1) % 5, 10 + i, 5 + i])
+        # Caras 6..10 (Anillo medio B)
+        for i in range(5):
+            self.caras_pentagonales.append([10 + i, 15 + i, 15 + (i + 1) % 5, 10 + (i + 1) % 5, 5 + (i + 1) % 5])
+
+    def _agregar_arista(self, u, v):
+        if v not in self.grafo[u]:
+            self.grafo[u].append(v)
+        if u not in self.grafo[v]:
+            self.grafo[v].append(u)
 
     def _existe_camino_seguro(self, inicio, destino):
         cola = deque([inicio])
@@ -101,29 +134,31 @@ class MundoWumpus:
         camino = self._obtener_camino_wumpus()
         if camino:
             return len(camino) - 1
-        return abs(self.pos_wumpus[0] - self.pos_jugador[0]) + abs(self.pos_wumpus[1] - self.pos_jugador[1])
+        return 3
 
     def inicializar_elementos(self):
         while True:
-            habitaciones = list(self.grafo.keys())
-            habitaciones.remove((0, 0))
+            cuevas = list(range(20))
+            cuevas.remove(0) # El inicio siempre es seguro en la cueva 0
             
-            self.pos_wumpus = random.choice(habitaciones)
-            habitaciones.remove(self.pos_wumpus)
+            self.pos_wumpus = random.choice(cuevas)
+            cuevas.remove(self.pos_wumpus)
             
-            self.pos_oro = random.choice(habitaciones)
-            habitaciones.remove(self.pos_oro)
+            self.pos_oro = random.choice(cuevas)
+            cuevas.remove(self.pos_oro)
             
-            pos_bat = random.choice(habitaciones)
+            pos_bat = random.choice(cuevas)
             self.pos_murcielagos = [pos_bat]
-            habitaciones.remove(pos_bat)
+            cuevas.remove(pos_bat)
             
-            self.pos_derrumbe = random.choice(habitaciones)
-            habitaciones.remove(self.pos_derrumbe)
+            self.pos_derrumbe = random.choice(cuevas)
+            cuevas.remove(self.pos_derrumbe)
             
-            self.pos_pozos = [hab for hab in habitaciones if random.random() < 0.2]
+            # Colocar 3 pozos en cuevas restantes
+            self.pos_pozos = random.sample(cuevas, 3)
             
-            if self._existe_camino_seguro((0, 0), self.pos_oro):
+            # Validar que exista camino transitable hasta el oro
+            if self._existe_camino_seguro(0, self.pos_oro):
                 break
 
     def percibir(self):
@@ -150,9 +185,9 @@ class MundoWumpus:
         candidatos = [n for n in self.grafo.get(self.pos_wumpus, []) if n not in self.pos_pozos]
         if candidatos:
             self.pos_wumpus = random.choice(candidatos)
-            self.notificar("¡Pasos pesados en la oscuridad! El Wumpus ha cambiado de cueva.", "alerta")
+            self.notificar("¡Pasos pesados en la oscuridad! El Wumpus se ha movido.", "alerta")
             if self.pos_wumpus == self.pos_jugador:
-                self.notificar("¡¡EL WUMPUS HA ENTRADO EN TU HABITACIÓN!!", "peligro")
+                self.notificar("¡¡EL WUMPUS HA ENTRADO EN TU CUEVA!!", "peligro")
                 self.verificar_estado()
 
     def cazar_jugador(self):
@@ -163,14 +198,14 @@ class MundoWumpus:
         if camino and len(camino) >= 2:
             siguiente_paso = camino[1]
             self.pos_wumpus = siguiente_paso
-            distancia_restante = len(camino) - 2
+            distancia = len(camino) - 2
             
             if self.pos_wumpus == self.pos_jugador:
                 self.notificar("¡¡EL WUMPUS TE ALCANZA Y TE DEVORA DE UN BOCADO!!", "peligro")
                 self.verificar_estado()
             else:
-                sufijo = "es" if distancia_restante > 1 else ""
-                self.notificar(f"¡Garras en la piedra! El Wumpus acecha a {distancia_restante} cueva{sufijo}.", "alerta")
+                sufijo = "s" if distancia > 1 else ""
+                self.notificar(f"¡Garras en la piedra! El Wumpus acecha a {distancia} cueva{sufijo}.", "alerta")
         else:
             self.notificar("Rugido lejano: el Wumpus busca otra ruta.", "alerta")
             self.mover_wumpus_aleatorio()
@@ -180,7 +215,7 @@ class MundoWumpus:
             return
             
         self.derrumbe_ocurrido = True
-        self.notificar("¡CRRAAAACK! ¡Derrumbe violento de rocas en el techo!", "derrumbe")
+        self.notificar("¡CRRAAAACK! ¡Derrumbe violento de rocas en un túnel!", "derrumbe")
         
         pos = self.pos_jugador
         vecinos = list(self.grafo.get(pos, []))
@@ -191,13 +226,13 @@ class MundoWumpus:
             self.grafo[pos].remove(v)
             self.grafo[v].remove(pos)
             
-            camino_inicio = self._existe_camino_seguro(self.pos_jugador, (0, 0))
+            camino_inicio = self._existe_camino_seguro(self.pos_jugador, 0)
             camino_oro = True if self.tiene_oro else self._existe_camino_seguro(self.pos_jugador, self.pos_oro)
             
             if camino_inicio and camino_oro:
                 tunel_bloqueado = True
                 self.bloqueos.add((min(pos, v), max(pos, v)))
-                self.notificar(f"¡Rocas sellan el túnel entre {pos} y {v}!", "derrumbe")
+                self.notificar(f"¡Rocas gigantes sellan el túnel entre la cueva {pos} y {v}!", "derrumbe")
                 break
             else:
                 self.grafo[pos].append(v)
@@ -226,23 +261,23 @@ class MundoWumpus:
                     self.cazar_jugador()
                 else:
                     dist = self._distancia_al_jugador()
-                    sufijo = "es" if dist > 1 else ""
+                    sufijo = "s" if dist > 1 else ""
                     self.notificar(f"Vibración en el suelo: el Wumpus está a {dist} cueva{sufijo}...", "alerta")
             return True
         else:
-            self.notificar(f"No hay túnel directo hacia {nueva_pos}", "error")
+            self.notificar(f"No hay túnel directo hacia la cueva {nueva_pos}", "error")
             return False
 
     def verificar_murcielagos(self):
         if self.pos_jugador in self.pos_murcielagos:
             self.notificar("¡SWOOOSH! ¡Murciélagos gigantes te llevan por el aire!", "murcielago")
-            posibles = [h for h in self.grafo.keys() if h != self.pos_jugador]
+            posibles = [h for h in range(20) if h != self.pos_jugador]
             destino = random.choice(posibles)
             self.notificar(f"¡Te dejan caer en la cueva {destino}!", "murcielago")
             self.pos_jugador = destino
             self.habitaciones_visitadas.add(destino)
             
-            libres = [h for h in posibles if h != destino and h != (0, 0)]
+            libres = [h for h in posibles if h != destino and h != 0]
             self.pos_murcielagos = [random.choice(libres)]
             self.verificar_estado()
 
@@ -260,21 +295,21 @@ class MundoWumpus:
             return False
 
         if objetivo not in self.grafo.get(self.pos_jugador, []):
-            self.notificar(f"Solo puedes lanzar piedras a cuevas adyacentes: {self.grafo.get(self.pos_jugador, [])}", "error")
+            self.notificar(f"Solo puedes lanzar piedras a cuevas conectadas: {self.grafo.get(self.pos_jugador, [])}", "error")
             return False
 
         self.piedras -= 1
-        self.notificar(f"Lanzas una piedra hacia {objetivo}...", "accion")
+        self.notificar(f"Lanzas una piedra hacia la cueva {objetivo}...", "accion")
 
         if objetivo in self.pos_pozos:
-            self.notificar("  > ... ¡SPLASH! Eco distante cayendo a un pozo sin fondo.", "pista")
+            self.notificar("  > ... ¡SPLASH! Eco distante cayendo al pozo.", "pista")
         elif objetivo == self.pos_wumpus and self.wumpus_vivo:
             self.notificar("  > ... ¡¡ROAAAR!! Golpeaste al Wumpus y huye enfurecido.", "alerta")
             self.mover_wumpus_aleatorio()
         elif objetivo in self.pos_murcielagos:
             self.notificar("  > ... ¡¡CHIIIRP!! Chillidos y aleteo de murciélagos gigantes.", "pista")
         elif objetivo == self.pos_derrumbe and not self.derrumbe_ocurrido:
-            self.notificar("  > ... ¡CRAC! Caen piedras del techo. Es una zona inestable.", "pista")
+            self.notificar("  > ... ¡CRAC! Caen piedras del techo. Cueva inestable.", "pista")
         else:
             self.notificar("  > ... ¡Clac-clac! Rueda tranquilamente por piedra sólida.", "pista")
 
@@ -287,7 +322,7 @@ class MundoWumpus:
     def agarrar(self):
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             self.tiene_oro = True
-            self.notificar("¡HAS COGIDO EL ORO! 💰 Regresa a (0, 0) para escapar.", "victoria")
+            self.notificar("¡HAS COGIDO EL ORO! 💰 Regresa a la Cueva 0 para escapar.", "victoria")
             
             if self.wumpus_vivo:
                 self.modo_caceria = True
@@ -305,43 +340,33 @@ class MundoWumpus:
             self.notificar("Ya no te quedan flechas.", "error")
             return False
 
-        if objetivo == self.pos_jugador:
-            self.notificar("No puedes disparar a tu propia cueva.", "error")
+        if objetivo not in self.grafo.get(self.pos_jugador, []):
+            self.notificar(f"Solo puedes disparar a través de un túnel conectado: {self.grafo.get(self.pos_jugador, [])}", "error")
             return False
-
-        x_orig, y_orig = self.pos_jugador
-        x_dest, y_dest = objetivo
-
-        dx = x_dest - x_orig
-        dy = y_dest - y_orig
-
-        if dx != 0 and dy != 0:
-            self.notificar("Solo puedes disparar en línea recta (N, S, E, O).", "error")
-            return False
-
-        paso_x = 1 if dx > 0 else (-1 if dx < 0 else 0)
-        paso_y = 1 if dy > 0 else (-1 if dy < 0 else 0)
 
         self.flechas -= 1
-        self.notificar(f"¡La flecha silba en dirección ({paso_x:+d}, {paso_y:+d})!", "accion")
+        self.notificar(f"¡La flecha silba hacia la cueva {objetivo}!", "accion")
 
-        cur_x, cur_y = x_orig + paso_x, y_orig + paso_y
+        # La flecha viaja hacia la cueva y puede atravesar
+        camino_flecha = [objetivo]
+        # Continuar la flecha 1 cueva más si está alineada
+        vecinos_dest = [v for v in self.grafo.get(objetivo, []) if v != self.pos_jugador]
+        if vecinos_dest:
+            camino_flecha.append(random.choice(vecinos_dest))
+
         impacto = False
-
-        while 0 <= cur_x < self.tamano and 0 <= cur_y < self.tamano:
-            if (cur_x, cur_y) == self.pos_wumpus and self.wumpus_vivo:
+        for cueva_f in camino_flecha:
+            if cueva_f == self.pos_wumpus and self.wumpus_vivo:
                 self.wumpus_vivo = False
                 impacto = True
-                self.notificar(f"¡¡GRITO ESCALOFRIANTE en ({cur_x}, {cur_y})!! Has matado al Wumpus.", "victoria")
+                self.notificar(f"¡¡GRITO ESCALOFRIANTE en la cueva {cueva_f}!! Has matado al Wumpus.", "victoria")
                 if self.modo_caceria:
                     self.modo_caceria = False
                     self.notificar("La cueva queda en silencio. La cacería ha terminado.", "victoria")
                 break
-            cur_x += paso_x
-            cur_y += paso_y
 
         if not impacto:
-            self.notificar("¡Clac! La flecha se pierde en la oscuridad sin acertar.", "alerta")
+            self.notificar("¡Clac! La flecha se estrella contra una pared sin acertar.", "alerta")
             if self.wumpus_vivo and not self.modo_caceria:
                 self.mover_wumpus_aleatorio()
 
@@ -353,10 +378,10 @@ class WumpusPygameApp:
         pygame.init()
         pygame.font.init()
 
-        self.width = 1080
-        self.height = 720
+        self.width = 1100
+        self.height = 740
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption("🏹 El Mundo del Wumpus - Mapa Pentagonal")
+        pygame.display.set_caption("🏹 El Mundo del Wumpus - Grafo de Pentágonos Pegados")
 
         self.clock = pygame.time.Clock()
         self.running = True
@@ -365,16 +390,16 @@ class WumpusPygameApp:
         self.font_bold = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 15, bold=True)
         self.font_normal = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13)
         self.font_small = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 11)
-        self.font_emoji = pygame.font.SysFont(["segoe ui emoji", "segoe ui symbol", "arial"], 22)
-        self.font_emoji_large = pygame.font.SysFont(["segoe ui emoji", "segoe ui symbol", "arial"], 28)
+        self.font_emoji = pygame.font.SysFont(["segoe ui emoji", "segoe ui symbol", "arial"], 20)
+        self.font_emoji_large = pygame.font.SysFont(["segoe ui emoji", "segoe ui symbol", "arial"], 26)
 
         self.log_mensajes = []
         self.modo_accion = "mover"
         self.juego = None
-        self.pentagonos = {}
-        self.radius = 46
+        self.coords_cuevas = {}
+        self.radio_cueva = 22
 
-        self._calcular_geometria_pentagonos()
+        self._calcular_coordenadas_vertices()
         self.nueva_partida()
 
     def agregar_log(self, mensaje, tipo="normal"):
@@ -384,39 +409,42 @@ class WumpusPygameApp:
 
     def nueva_partida(self):
         self.log_mensajes.clear()
-        self.juego = MundoWumpus(callback_log=self.agregar_log)
+        self.juego = MundoWumpusDodecaedro(callback_log=self.agregar_log)
         self.modo_accion = "mover"
-        self.agregar_log("⚔️ ¡Nueva expedición iniciada en la cueva!", "victoria")
-        self.agregar_log("Encuentra el oro y regresa con vida a (0, 0).", "normal")
+        self.agregar_log("⚔️ ¡Nueva expedición en la red pentagonal!", "victoria")
+        self.agregar_log("Las aristas son túneles y los vértices son las 20 cuevas.", "normal")
+        self.agregar_log("Encuentra el oro y regresa a la Cueva 0 para escapar.", "normal")
 
-    def _calcular_geometria_pentagonos(self):
-        self.pentagonos.clear()
-        offset_x = 105
-        offset_y = 120
-        spacing_x = 142
-        spacing_y = 142
+    def _calcular_coordenadas_vertices(self):
+        self.coords_cuevas.clear()
+        cx, cy = 330, 365
+        r0, r1, r2, r3 = 70, 145, 215, 290
 
-        for x in range(4):
-            for y in range(4):
-                cx = offset_x + x * spacing_x
-                cy = offset_y + (3 - y) * spacing_y
-                vertices = []
-                for k in range(5):
-                    angle = -math.pi / 2 + k * (2 * math.pi / 5)
-                    vx = cx + self.radius * math.cos(angle)
-                    vy = cy + self.radius * math.sin(angle)
-                    vertices.append((vx, vy))
-                self.pentagonos[(x, y)] = {
-                    "centro": (cx, cy),
-                    "vertices": vertices
-                }
+        # Anillo 0: Vértices 0..4 (Pentágono Central)
+        for i in range(5):
+            ang = -math.pi / 2 + i * (2 * math.pi / 5)
+            self.coords_cuevas[i] = (int(cx + r0 * math.cos(ang)), int(cy + r0 * math.sin(ang)))
+
+        # Anillo 1: Vértices 5..9 (Conexiones radiales desde Anillo 0)
+        for i in range(5):
+            ang = -math.pi / 2 + i * (2 * math.pi / 5)
+            self.coords_cuevas[i + 5] = (int(cx + r1 * math.cos(ang)), int(cy + r1 * math.sin(ang)))
+
+        # Anillo 2: Vértices 10..14 (Desfasados 36° para formar pentágonos)
+        for i in range(5):
+            ang = -math.pi / 2 + math.pi / 5 + i * (2 * math.pi / 5)
+            self.coords_cuevas[10 + i] = (int(cx + r2 * math.cos(ang)), int(cy + r2 * math.sin(ang)))
+
+        # Anillo 3: Vértices 15..19 (Pentágono Exterior)
+        for i in range(5):
+            ang = -math.pi / 2 + math.pi / 5 + i * (2 * math.pi / 5)
+            self.coords_cuevas[15 + i] = (int(cx + r3 * math.cos(ang)), int(cy + r3 * math.sin(ang)))
 
     def obtener_cueva_bajo_cursor(self, mx, my):
-        for pos, datos in self.pentagonos.items():
-            cx, cy = datos["centro"]
+        for cueva, (cx, cy) in self.coords_cuevas.items():
             dist_sq = (mx - cx) ** 2 + (my - cy) ** 2
-            if dist_sq <= self.radius ** 2:
-                return pos
+            if dist_sq <= (self.radio_cueva + 6) ** 2:
+                return cueva
         return None
 
     def interactuar_con_cueva(self, objetivo):
@@ -430,7 +458,7 @@ class WumpusPygameApp:
             elif objetivo in self.juego.grafo.get(self.juego.pos_jugador, []):
                 self.juego.mover(objetivo)
             else:
-                self.agregar_log("No hay túnel hacia esa cueva.", "error")
+                self.agregar_log(f"No hay túnel directo hacia la cueva {objetivo}.", "error")
 
         elif self.modo_accion == "disparar":
             if self.juego.disparar(objetivo):
@@ -439,13 +467,6 @@ class WumpusPygameApp:
         elif self.modo_accion == "lanzar":
             if self.juego.lanzar_piedra(objetivo):
                 self.modo_accion = "mover"
-
-    def mover_direccion(self, dx, dy):
-        if not self.juego.vivo:
-            return
-        x, y = self.juego.pos_jugador
-        objetivo = (x + dx, y + dy)
-        self.interactuar_con_cueva(objetivo)
 
     def run(self):
         while self.running:
@@ -470,7 +491,7 @@ class WumpusPygameApp:
                     if self.juego.flechas > 0 and self.juego.vivo:
                         self.modo_accion = "disparar" if self.modo_accion != "disparar" else "mover"
                         if self.modo_accion == "disparar":
-                            self.agregar_log("Modo DISPARAR: Haz clic en una cueva contigua.", "alerta")
+                            self.agregar_log("Modo DISPARAR: Haz clic en una cueva vecina conectada.", "alerta")
                     else:
                         self.agregar_log("No tienes flechas disponibles.", "error")
 
@@ -478,7 +499,7 @@ class WumpusPygameApp:
                     if self.juego.piedras > 0 and self.juego.vivo:
                         self.modo_accion = "lanzar" if self.modo_accion != "lanzar" else "mover"
                         if self.modo_accion == "lanzar":
-                            self.agregar_log("Modo PIEDRA: Haz clic en una cueva contigua para escuchar.", "alerta")
+                            self.agregar_log("Modo PIEDRA: Haz clic en una cueva vecina para escuchar.", "alerta")
                     else:
                         self.agregar_log("No te quedan piedras.", "error")
 
@@ -489,19 +510,24 @@ class WumpusPygameApp:
                 elif self.btn_reiniciar_rect.collidepoint(event.pos):
                     self.nueva_partida()
 
-                # Comprobar clics en el mapa pentagonal
-                elif cueva_hover is not None:
+                # Clic en botones de acceso directo a vecinos (1, 2, 3)
+                for btn_rect, cueva_vec in self.botones_vecinos:
+                    if btn_rect.collidepoint(event.pos):
+                        self.interactuar_con_cueva(cueva_vec)
+                        break
+
+                # Clic sobre vértices/cuevas en el mapa
+                if cueva_hover is not None:
                     self.interactuar_con_cueva(cueva_hover)
 
             elif event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_w, pygame.K_UP):
-                    self.mover_direccion(0, 1)
-                elif event.key in (pygame.K_s, pygame.K_DOWN):
-                    self.mover_direccion(0, -1)
-                elif event.key in (pygame.K_a, pygame.K_LEFT):
-                    self.mover_direccion(-1, 0)
-                elif event.key in (pygame.K_d, pygame.K_RIGHT):
-                    self.mover_direccion(1, 0)
+                vecinos = self.juego.grafo.get(self.juego.pos_jugador, [])
+                if event.key == pygame.K_1 and len(vecinos) >= 1:
+                    self.interactuar_con_cueva(vecinos[0])
+                elif event.key == pygame.K_2 and len(vecinos) >= 2:
+                    self.interactuar_con_cueva(vecinos[1])
+                elif event.key == pygame.K_3 and len(vecinos) >= 3:
+                    self.interactuar_con_cueva(vecinos[2])
                 elif event.key == pygame.K_f:
                     if self.juego.flechas > 0 and self.juego.vivo:
                         self.modo_accion = "disparar" if self.modo_accion != "disparar" else "mover"
@@ -518,88 +544,91 @@ class WumpusPygameApp:
 
     def _render(self):
         self.screen.fill(COLOR_BG)
-        self._dibujar_mapa_pentagonal()
+        self._dibujar_red_pentagonal()
         self._dibujar_panel_derecho()
         self._dibujar_estado_final()
         pygame.display.flip()
 
-    def _dibujar_mapa_pentagonal(self):
+    def _dibujar_red_pentagonal(self):
         mouse_pos = pygame.mouse.get_pos()
         cueva_hover = self.obtener_cueva_bajo_cursor(*mouse_pos)
         vecinos_jugador = self.juego.grafo.get(self.juego.pos_jugador, [])
-        partida_terminada = (not self.juego.vivo) or (self.juego.pos_jugador == (0, 0) and self.juego.tiene_oro)
+        partida_terminada = (not self.juego.vivo) or (self.juego.pos_jugador == 0 and self.juego.tiene_oro)
 
-        # 1. Dibujar túneles (aristas del grafo no dirigido)
-        trazados = set()
+        # 1. Dibujar las 11 caras pentagonales pegadas (polígonos de fondo)
+        for cara in self.juego.caras_pentagonales:
+            puntos_poligono = [self.coords_cuevas[v] for v in cara]
+            pygame.draw.polygon(self.screen, COLOR_FACE, puntos_poligono)
+            pygame.draw.polygon(self.screen, COLOR_FACE_BORDER, puntos_poligono, 1)
+
+        # 2. Dibujar las aristas (los túneles/pasadizos que unen los vértices)
+        aristas_dibujadas = set()
         for u, vecinos in self.juego.grafo.items():
             for v in vecinos:
                 arista = (min(u, v), max(u, v))
-                if arista not in trazados:
-                    trazados.add(arista)
-                    p1 = self.pentagonos[u]["centro"]
-                    p2 = self.pentagonos[v]["centro"]
-                    pygame.draw.line(self.screen, COLOR_TUNNEL, p1, p2, 10)
-                    pygame.draw.line(self.screen, COLOR_TUNNEL_INNER, p1, p2, 6)
+                if arista not in aristas_dibujadas:
+                    aristas_dibujadas.add(arista)
+                    p1 = self.coords_cuevas[u]
+                    p2 = self.coords_cuevas[v]
 
-        # Dibujar túneles derrumbados / bloqueados
+                    # Si el jugador está en u o v, iluminar el túnel
+                    es_tunel_activo = (u == self.juego.pos_jugador or v == self.juego.pos_jugador)
+                    color_t = (80, 85, 120) if es_tunel_activo else COLOR_TUNNEL
+                    color_ti = COLOR_CYAN if (es_tunel_activo and self.juego.vivo) else COLOR_TUNNEL_INNER
+
+                    pygame.draw.line(self.screen, color_t, p1, p2, 8)
+                    pygame.draw.line(self.screen, color_ti, p1, p2, 4)
+
+        # Dibujar derrumbes bloqueados sobre aristas
         for u, v in self.juego.bloqueos:
-            p1 = self.pentagonos[u]["centro"]
-            p2 = self.pentagonos[v]["centro"]
+            p1 = self.coords_cuevas[u]
+            p2 = self.coords_cuevas[v]
             mid_x = (p1[0] + p2[0]) / 2
             mid_y = (p1[1] + p2[1]) / 2
-            pygame.draw.circle(self.screen, (50, 20, 20), (int(mid_x), int(mid_y)), 15)
-            pygame.draw.line(self.screen, COLOR_RED, (mid_x - 8, mid_y - 8), (mid_x + 8, mid_y + 8), 3)
-            pygame.draw.line(self.screen, COLOR_RED, (mid_x - 8, mid_y + 8), (mid_x + 8, mid_y - 8), 3)
+            pygame.draw.circle(self.screen, (60, 20, 20), (int(mid_x), int(mid_y)), 14)
+            pygame.draw.line(self.screen, COLOR_RED, (mid_x - 7, mid_y - 7), (mid_x + 7, mid_y + 7), 3)
+            pygame.draw.line(self.screen, COLOR_RED, (mid_x - 7, mid_y + 7), (mid_x + 7, mid_y - 7), 3)
 
-        # 2. Dibujar habitaciones pentagonales
+        # 3. Dibujar los vértices (las 20 cuevas)
         time_ms = pygame.time.get_ticks()
-        for pos, datos in self.pentagonos.items():
-            vertices = datos["vertices"]
-            cx, cy = datos["centro"]
-            es_jugador = (pos == self.juego.pos_jugador)
-            es_visitada = (pos in self.juego.habitaciones_visitadas)
-            es_vecino = (pos in vecinos_jugador)
+        for cueva, (cx, cy) in self.coords_cuevas.items():
+            es_jugador = (cueva == self.juego.pos_jugador)
+            es_visitada = (cueva in self.juego.habitaciones_visitadas)
+            es_vecino = (cueva in vecinos_jugador)
 
-            # Colores base según estado
+            r = self.radio_cueva
             if es_jugador:
-                color_fill = COLOR_PENT_PLAYER
-                color_border = COLOR_PENT_PLAYER_BORDER
-                pulse = 3 + int(2 * math.sin(time_ms * 0.006))
-                border_width = 3 + pulse
+                pulse = int(3 * math.sin(time_ms * 0.007))
+                pygame.draw.circle(self.screen, (50, 90, 150), (cx, cy), r + 5 + pulse, 2)
+                pygame.draw.circle(self.screen, COLOR_NODE_PLAYER, (cx, cy), r)
+                pygame.draw.circle(self.screen, COLOR_NODE_PLAYER_BORDER, (cx, cy), r, 3)
             elif es_visitada or partida_terminada:
-                color_fill = COLOR_PENT_VISITED
-                color_border = COLOR_PENT_VISITED_BORDER
-                border_width = 2
+                pygame.draw.circle(self.screen, COLOR_NODE_VISITED, (cx, cy), r)
+                pygame.draw.circle(self.screen, COLOR_NODE_VISITED_BORDER, (cx, cy), r, 2)
             else:
-                color_fill = COLOR_PENT_FOG
-                color_border = COLOR_PENT_FOG_BORDER
-                border_width = 2
+                pygame.draw.circle(self.screen, COLOR_NODE_FOG, (cx, cy), r)
+                pygame.draw.circle(self.screen, COLOR_NODE_FOG_BORDER, (cx, cy), r, 2)
 
-            # Resaltar si el cursor está encima y es vecina
-            if cueva_hover == pos and es_vecino and self.juego.vivo:
-                if self.modo_accion == "mover":
-                    color_border = COLOR_CYAN
-                elif self.modo_accion == "disparar":
-                    color_border = COLOR_RED
+            # Resaltar si es cueva vecina disponible
+            if es_vecino and self.juego.vivo:
+                color_halo = COLOR_GREEN
+                if self.modo_accion == "disparar":
+                    color_halo = COLOR_RED
                 elif self.modo_accion == "lanzar":
-                    color_border = COLOR_ORANGE
-                border_width = 4
+                    color_halo = COLOR_ORANGE
 
-            # Relleno y borde pentagonal
-            pygame.draw.polygon(self.screen, color_fill, vertices)
-            pygame.draw.polygon(self.screen, color_border, vertices, border_width)
+                if cueva_hover == cueva:
+                    pygame.draw.circle(self.screen, color_halo, (cx, cy), r + 4, 3)
+                else:
+                    pygame.draw.circle(self.screen, color_halo, (cx, cy), r + 3, 1)
 
-            # Coordenadas pequeñas de la cueva
-            txt_coord = self.font_small.render(f"{pos[0]},{pos[1]}", True, (90, 95, 125))
-            self.screen.blit(txt_coord, (cx - txt_coord.get_width() // 2, cy - 36))
-
-            # Contenido dentro del pentágono
+            # Contenido del vértice (cueva)
             if es_jugador:
-                avatar = "🤠💰" if self.juego.tiene_oro else "🧙‍♂️"
-                txt_avatar = self.font_emoji_large.render(avatar, True, COLOR_TEXT)
-                self.screen.blit(txt_avatar, (cx - txt_avatar.get_width() // 2, cy - txt_avatar.get_height() // 2 - 2))
+                avatar = "🤠" if not self.juego.tiene_oro else "💰"
+                txt_av = self.font_emoji.render(avatar, True, COLOR_TEXT)
+                self.screen.blit(txt_av, (cx - txt_av.get_width() // 2, cy - txt_av.get_height() // 2))
 
-                # Percepciones dentro de la cueva del jugador
+                # Percepciones alrededor del jugador
                 percepciones = self.juego.percibir()
                 iconos = []
                 if "Hedor" in percepciones: iconos.append("🦨")
@@ -609,110 +638,125 @@ class WumpusPygameApp:
                 if "Crujido" in percepciones: iconos.append("💥")
 
                 if iconos:
-                    txt_perc = self.font_small.render(" ".join(iconos), True, COLOR_GOLD)
-                    self.screen.blit(txt_perc, (cx - txt_perc.get_width() // 2, cy + 16))
+                    txt_ic = self.font_small.render("".join(iconos), True, COLOR_GOLD)
+                    self.screen.blit(txt_ic, (cx - txt_ic.get_width() // 2, cy + 24))
 
             elif partida_terminada:
-                # Revelación de toda la cueva
-                if pos == self.juego.pos_wumpus:
+                if cueva == self.juego.pos_wumpus:
                     txt_item = self.font_emoji.render("👹" if self.juego.wumpus_vivo else "💀", True, COLOR_RED)
-                    lbl = self.font_small.render("WUMPUS", True, COLOR_RED)
-                elif pos == self.juego.pos_oro:
+                elif cueva == self.juego.pos_oro:
                     txt_item = self.font_emoji.render("💰", True, COLOR_GOLD)
-                    lbl = self.font_small.render("ORO", True, COLOR_GOLD)
-                elif pos in self.juego.pos_pozos:
+                elif cueva in self.juego.pos_pozos:
                     txt_item = self.font_emoji.render("🕳️", True, COLOR_CYAN)
-                    lbl = self.font_small.render("POZO", True, COLOR_CYAN)
-                elif pos in self.juego.pos_murcielagos:
+                elif cueva in self.juego.pos_murcielagos:
                     txt_item = self.font_emoji.render("🦇", True, COLOR_PURPLE)
-                    lbl = self.font_small.render("MURCIÉLAGOS", True, COLOR_PURPLE)
-                elif pos == self.juego.pos_derrumbe:
+                elif cueva == self.juego.pos_derrumbe:
                     txt_item = self.font_emoji.render("🪨", True, COLOR_ORANGE)
-                    lbl = self.font_small.render("DERRUMBE", True, COLOR_ORANGE)
                 else:
-                    txt_item = self.font_bold.render("·", True, COLOR_SUBTEXT)
-                    lbl = self.font_small.render("SEGURO", True, (80, 85, 110))
+                    txt_item = self.font_small.render(str(cueva), True, COLOR_SUBTEXT)
 
-                self.screen.blit(txt_item, (cx - txt_item.get_width() // 2, cy - 18))
-                self.screen.blit(lbl, (cx - lbl.get_width() // 2, cy + 12))
+                self.screen.blit(txt_item, (cx - txt_item.get_width() // 2, cy - txt_item.get_height() // 2))
 
             else:
-                if not es_visitada:
-                    txt_fog = self.font_bold.render("?", True, (65, 68, 90))
+                if es_visitada:
+                    txt_num = self.font_small.render(str(cueva), True, COLOR_TEXT)
+                    self.screen.blit(txt_num, (cx - txt_num.get_width() // 2, cy - txt_num.get_height() // 2))
+                else:
+                    txt_fog = self.font_small.render("?", True, (80, 85, 110))
                     self.screen.blit(txt_fog, (cx - txt_fog.get_width() // 2, cy - txt_fog.get_height() // 2))
 
-        # Ejes y Leyenda inferior del mapa
-        txt_mapa_guia = self.font_small.render("⬟ Mapa Pentagonal: Las cuevas son pentágonos y las líneas son los túneles", True, COLOR_SUBTEXT)
-        self.screen.blit(txt_mapa_guia, (75, self.height - 35))
+        # Guía inferior del mapa
+        txt_guia = self.font_small.render("⬟ Red Dodecaédrica: 12 pentágonos pegados | 30 aristas (túneles) | 20 vértices (cuevas)", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_guia, (35, self.height - 30))
 
     def _dibujar_panel_derecho(self):
-        panel_x = 640
+        panel_x = 655
         panel_w = 415
 
-        # 1. Cabecera y Título
+        # 1. Cabecera
         txt_titulo = self.font_title.render("🏹 EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
-        self.screen.blit(txt_titulo, (panel_x, 18))
-        txt_sub = self.font_small.render("Exploración táctica y supervivencia en cueva pentagonal", True, COLOR_SUBTEXT)
-        self.screen.blit(txt_sub, (panel_x, 48))
+        self.screen.blit(txt_titulo, (panel_x, 16))
+        txt_sub = self.font_small.render("Grafo de pentágonos pegados (Dodecaedro de 20 cuevas)", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_sub, (panel_x, 44))
 
         # 2. Banner de Cacería Activa
-        banner_y = 74
+        banner_y = 68
         if self.juego.modo_caceria and self.juego.wumpus_vivo:
             dist = self.juego._distancia_al_jugador()
-            sufijo = "es" if dist > 1 else ""
+            sufijo = "s" if dist > 1 else ""
             banner_rect = pygame.Rect(panel_x, banner_y, panel_w, 36)
             pygame.draw.rect(self.screen, COLOR_RED, banner_rect, border_radius=6)
             txt_cac = self.font_bold.render(f"🚨 ¡¡WUMPUS EN CACERÍA!! Acechando a {dist} cueva{sufijo}", True, (20, 20, 30))
             self.screen.blit(txt_cac, (panel_x + 14, banner_y + 8))
-            inv_y = banner_y + 46
+            inv_y = banner_y + 44
         else:
             inv_y = banner_y
 
         # 3. Tarjeta de Inventario y Estado
-        inv_rect = pygame.Rect(panel_x, inv_y, panel_w, 88)
+        inv_rect = pygame.Rect(panel_x, inv_y, panel_w, 86)
         pygame.draw.rect(self.screen, COLOR_PANEL, inv_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, inv_rect, 1, border_radius=8)
 
-        txt_inv_titulo = self.font_bold.render("🎒 Inventario y Explorador", True, COLOR_GOLD)
+        txt_inv_titulo = self.font_bold.render("🎒 Estado del Explorador", True, COLOR_GOLD)
         self.screen.blit(txt_inv_titulo, (panel_x + 14, inv_y + 10))
 
         txt_fl = self.font_normal.render(f"🏹 Flechas: {self.juego.flechas}", True, COLOR_TEXT)
-        self.screen.blit(txt_fl, (panel_x + 16, inv_y + 36))
+        self.screen.blit(txt_fl, (panel_x + 16, inv_y + 34))
 
         txt_pd = self.font_normal.render(f"🪨 Piedras: {self.juego.piedras}", True, COLOR_TEXT)
-        self.screen.blit(txt_pd, (panel_x + 160, inv_y + 36))
+        self.screen.blit(txt_pd, (panel_x + 160, inv_y + 34))
 
         oro_str = "¡CONSEGUIDO! 🏆" if self.juego.tiene_oro else "No"
         txt_oro = self.font_normal.render(f"💰 Oro: {oro_str}", True, COLOR_GOLD if self.juego.tiene_oro else COLOR_TEXT)
-        self.screen.blit(txt_oro, (panel_x + 16, inv_y + 60))
+        self.screen.blit(txt_oro, (panel_x + 16, inv_y + 58))
 
         txt_pos = self.font_normal.render(f"📍 Cueva actual: {self.juego.pos_jugador}", True, COLOR_CYAN)
-        self.screen.blit(txt_pos, (panel_x + 160, inv_y + 60))
+        self.screen.blit(txt_pos, (panel_x + 160, inv_y + 58))
 
-        # 4. Percepciones Sensoriales
-        perc_y = inv_y + 98
-        perc_rect = pygame.Rect(panel_x, perc_y, panel_w, 62)
+        # 4. Percepciones
+        perc_y = inv_y + 94
+        perc_rect = pygame.Rect(panel_x, perc_y, panel_w, 60)
         pygame.draw.rect(self.screen, COLOR_PANEL, perc_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, perc_rect, 1, border_radius=8)
 
         txt_per_tit = self.font_bold.render("👂 Percepciones en esta cueva:", True, COLOR_TEXT)
-        self.screen.blit(txt_per_tit, (panel_x + 14, perc_y + 10))
+        self.screen.blit(txt_per_tit, (panel_x + 14, perc_y + 8))
 
         percepciones = self.juego.percibir()
         if percepciones:
             txt_percs = self.font_bold.render("  •  " + "   •  ".join(percepciones), True, COLOR_GOLD)
         else:
-            txt_percs = self.font_normal.render("Silencio y calma. No percibes nada inusual.", True, (110, 115, 140))
-        self.screen.blit(txt_percs, (panel_x + 14, perc_y + 34))
+            txt_percs = self.font_normal.render("Silencio absoluto. No percibes peligros contiguos.", True, (110, 115, 140))
+        self.screen.blit(txt_percs, (panel_x + 14, perc_y + 32))
 
-        # 5. Botones de Acción
-        btn_y = perc_y + 72
+        # 5. Túneles conectados y botones de salto
+        tun_y = perc_y + 68
+        tun_rect = pygame.Rect(panel_x, tun_y, panel_w, 66)
+        pygame.draw.rect(self.screen, COLOR_PANEL, tun_rect, border_radius=8)
+        pygame.draw.rect(self.screen, COLOR_BORDER, tun_rect, 1, border_radius=8)
+
+        txt_tun_tit = self.font_bold.render(f"🚪 Túneles desde Cueva {self.juego.pos_jugador}:", True, COLOR_TEXT)
+        self.screen.blit(txt_tun_tit, (panel_x + 14, tun_y + 8))
+
+        vecinos = self.juego.grafo.get(self.juego.pos_jugador, [])
+        self.botones_vecinos = []
+        btn_w = 120
+        for idx, v in enumerate(vecinos):
+            bx = panel_x + 14 + idx * (btn_w + 10)
+            by = tun_y + 30
+            b_rect = pygame.Rect(bx, by, btn_w, 28)
+            self.botones_vecinos.append((b_rect, v))
+            pygame.draw.rect(self.screen, (45, 50, 75), b_rect, border_radius=5)
+            txt_btn_v = self.font_bold.render(f"[{idx+1}] Cueva {v}", True, COLOR_CYAN)
+            self.screen.blit(txt_btn_v, (bx + 20, by + 5))
+
+        # 6. Botones de Acción
+        btn_y = tun_y + 74
         self.btn_disparar_rect = pygame.Rect(panel_x, btn_y, 130, 36)
         self.btn_lanzar_rect = pygame.Rect(panel_x + 140, btn_y, 130, 36)
         self.btn_agarrar_rect = pygame.Rect(panel_x + 280, btn_y, 135, 36)
         self.btn_reiniciar_rect = pygame.Rect(panel_x, btn_y + 44, panel_w, 32)
 
-        # Colores dinámicos según modo
         c_disp = COLOR_RED if self.modo_accion == "disparar" else (60, 65, 85)
         c_lanz = COLOR_ORANGE if self.modo_accion == "lanzar" else (60, 65, 85)
         c_agar = COLOR_GREEN if self.juego.pos_jugador == self.juego.pos_oro and not self.juego.tiene_oro else (50, 75, 60)
@@ -725,26 +769,26 @@ class WumpusPygameApp:
         txt_b_disp = self.font_bold.render("🏹 Disparar (F)", True, (20, 20, 30) if self.modo_accion == "disparar" else COLOR_TEXT)
         txt_b_lanz = self.font_bold.render("🪨 Piedra (P)", True, (20, 20, 30) if self.modo_accion == "lanzar" else COLOR_TEXT)
         txt_b_agar = self.font_bold.render("💰 Agarrar (G)", True, (20, 20, 30) if c_agar == COLOR_GREEN else COLOR_TEXT)
-        txt_b_rein = self.font_bold.render("🔄 Nueva Cueva Aleatoria (R)", True, COLOR_TEXT)
+        txt_b_rein = self.font_bold.render("🔄 Nueva Red Dodecaédrica (R)", True, COLOR_TEXT)
 
         self.screen.blit(txt_b_disp, (panel_x + 14, btn_y + 9))
         self.screen.blit(txt_b_lanz, (panel_x + 154, btn_y + 9))
         self.screen.blit(txt_b_agar, (panel_x + 292, btn_y + 9))
-        self.screen.blit(txt_b_rein, (panel_x + 105, btn_y + 51))
+        self.screen.blit(txt_b_rein, (panel_x + 85, btn_y + 51))
 
-        # 6. Bitácora de Eventos
-        log_y = btn_y + 88
-        log_h = self.height - log_y - 45
+        # 7. Bitácora de Eventos
+        log_y = btn_y + 86
+        log_h = self.height - log_y - 35
         log_rect = pygame.Rect(panel_x, log_y, panel_w, log_h)
-        pygame.draw.rect(self.screen, (17, 17, 27), log_rect, border_radius=8)
+        pygame.draw.rect(self.screen, (16, 16, 26), log_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, log_rect, 1, border_radius=8)
 
         txt_log_tit = self.font_bold.render("📜 Bitácora de la Aventura", True, COLOR_GOLD)
         self.screen.blit(txt_log_tit, (panel_x + 14, log_y + 8))
 
-        line_y = log_y + 32
+        line_y = log_y + 30
         for msg, tipo in self.log_mensajes[-7:]:
-            if tipo == "peligro" or tipo == "muerte":
+            if tipo in ("peligro", "muerte"):
                 c = COLOR_RED
             elif tipo == "victoria":
                 c = COLOR_GREEN
@@ -763,20 +807,19 @@ class WumpusPygameApp:
             self.screen.blit(txt_line, (panel_x + 14, line_y))
             line_y += 20
 
-        # 7. Controles y atajos al pie
-        txt_ctrls = self.font_small.render("Atajos: WASD / Flechas para mover | Clic para interactuar | Esc para cancelar", True, COLOR_SUBTEXT)
-        self.screen.blit(txt_ctrls, (panel_x, self.height - 28))
+        txt_ctrls = self.font_small.render("Atajos: 1, 2, 3 o Clic en vértices | F: Disparo | P: Piedra | R: Reiniciar", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_ctrls, (panel_x, self.height - 22))
 
     def _dibujar_estado_final(self):
-        if self.juego.pos_jugador == (0, 0) and self.juego.tiene_oro:
-            banner_rect = pygame.Rect(60, 20, 520, 50)
+        if self.juego.pos_jugador == 0 and self.juego.tiene_oro:
+            banner_rect = pygame.Rect(50, 16, 560, 46)
             pygame.draw.rect(self.screen, (30, 80, 50), banner_rect, border_radius=8)
             pygame.draw.rect(self.screen, COLOR_GREEN, banner_rect, 2, border_radius=8)
             txt_vic = self.font_bold.render("🏆 ¡¡HAS ESCAPADO CON EL ORO!! ¡¡VICTORIA!! (Pulsa R)", True, COLOR_GREEN)
             self.screen.blit(txt_vic, (banner_rect.centerx - txt_vic.get_width() // 2, banner_rect.centery - txt_vic.get_height() // 2))
 
         elif not self.juego.vivo:
-            banner_rect = pygame.Rect(60, 20, 520, 50)
+            banner_rect = pygame.Rect(50, 16, 560, 46)
             pygame.draw.rect(self.screen, (70, 20, 30), banner_rect, border_radius=8)
             pygame.draw.rect(self.screen, COLOR_RED, banner_rect, 2, border_radius=8)
             txt_der = self.font_bold.render("💀 HAS MUERTO EN LA CUEVA. Cueva revelada. (Pulsa R)", True, COLOR_RED)

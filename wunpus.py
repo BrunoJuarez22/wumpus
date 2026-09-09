@@ -665,9 +665,7 @@ class WumpusPygameApp:
                     txt_fog = self.font_small.render("?", True, (80, 85, 110))
                     self.screen.blit(txt_fog, (cx - txt_fog.get_width() // 2, cy - txt_fog.get_height() // 2))
 
-        # Guía inferior del mapa
-        txt_guia = self.font_small.render("⬟ Red Dodecaédrica: 12 pentágonos pegados | 30 aristas (túneles) | 20 vértices (cuevas)", True, COLOR_SUBTEXT)
-        self.screen.blit(txt_guia, (35, self.height - 30))
+
 
     def _dibujar_panel_derecho(self):
         panel_x = 655
@@ -807,8 +805,7 @@ class WumpusPygameApp:
             self.screen.blit(txt_line, (panel_x + 14, line_y))
             line_y += 20
 
-        txt_ctrls = self.font_small.render("Atajos: 1, 2, 3 o Clic en vértices | F: Disparo | P: Piedra | R: Reiniciar", True, COLOR_SUBTEXT)
-        self.screen.blit(txt_ctrls, (panel_x, self.height - 22))
+
 
     def _dibujar_estado_final(self):
         if self.juego.pos_jugador == 0 and self.juego.tiene_oro:

@@ -6,6 +6,7 @@ Lenguaje: Python 3
 Estructura de datos principal: Grafo no dirigido con Lista de Adyacencia (Diccionario {cueva: [vecinos]})
 Identificación de cuevas: Números enteros del 1 al 16 (formato [N:?])
 Algoritmos clave: Búsqueda en Anchura (BFS), Raycasting en línea recta, Análisis de texto (Regex)
+Sistema de puntuación: Puntuación base acumulativa + Multiplicador de eficiencia de movimientos
 ================================================================================
 
 
@@ -15,8 +16,11 @@ Algoritmos clave: Búsqueda en Anchura (BFS), Raycasting en línea recta, Análi
 1.1. imprimir_mecanicas()
 ¿Qué hace?
   Imprime en consola el panel con las novedades y reglas añadidas respecto
-  a la versión original del juego de 1972 (Modo Cacería, Lanzamiento de Piedras,
-  y Partida Siempre Ganable).
+  a la versión original del juego de 1972:
+  - Modo Cacería del Wumpus.
+  - Lanzamiento de Piedras (3 en bolsa).
+  - Partida Siempre Ganable.
+  - Sistema de Puntuación y Eficiencia de movimientos.
 Funcionamiento en programación:
   - Despliega una cadena multilínea formateada sin tecnicismos para el usuario.
 
@@ -49,6 +53,9 @@ Funcionamiento en programación:
   - `self.flechas`: Cantidad de flechas disponibles (inicia con 1).
   - `self.piedras`: Cantidad de piedras para tantear (inicia con 3).
   - `self.habitaciones_visitadas`: Conjunto de cuevas exploradas (niebla de guerra).
+  - `self.movimientos_totales`: Contador de desplazamientos realizados por el jugador.
+  - `self.ecos_detectados`: Contador de peligros detectados o impactos con piedras.
+  - `self.causa_muerte`: Cadena descriptiva de la causa de fin de la partida.
 
 
 2.2. _cueva_a_xy(self, c) y _xy_a_cueva(self, x, y)
@@ -69,13 +76,14 @@ Funcionamiento en programación:
   - Almacena el resultado en `self.grafo[c]`.
 
 
-2.4. _existe_camino_seguro(self, inicio, destino)
+2.4. _existe_camino_seguro(self, inicio, destino) y _calcular_camino_optimo_oro(self)
 ¿Qué hace?
   Valida mediante Búsqueda en Anchura (BFS) si existe al menos una ruta transitable
-  libre de pozos entre dos cuevas dadas.
+  libre de pozos entre dos cuevas, y calcula la ruta óptima de menor distancia
+  hacia el oro para evaluar la eficiencia de movimientos.
 Funcionamiento en programación:
   - Utiliza una cola FIFO (`deque`) y un conjunto de visitados.
-  - Garantiza que la cueva 1 siempre tenga camino seguro hacia el oro y salida.
+  - Devuelve la lista exacta de cuevas que forman la ruta más corta.
 
 
 2.5. _obtener_camino_wumpus(self) y _distancia_al_jugador(self)
@@ -83,7 +91,6 @@ Funcionamiento en programación:
   Calcula la ruta más corta y la distancia en turnos que separa al Wumpus del jugador.
 Funcionamiento en programación:
   - Realiza un BFS desde `self.pos_wumpus` hasta `self.pos_jugador`.
-  - Devuelve la lista completa de cuevas que forman el camino óptimo.
 
 
 2.6. inicializar_elementos(self)
@@ -110,7 +117,7 @@ Funcionamiento en programación:
   Controla la inteligencia artificial de persecución del Wumpus en Modo Cacería.
 Funcionamiento en programación:
   - Obtiene el camino más corto hacia el jugador y avanza un paso por él.
-  - Si alcanza la cueva del jugador, lo devora de inmediato.
+  - Si alcanza la cueva del jugador, lo devora de inmediato y registra la causa de muerte.
 
 
 2.10. activar_derrumbe(self)
@@ -122,38 +129,38 @@ Funcionamiento en programación:
 2.11. mover(self, nueva_pos)
 ¿Qué hace?
   Desplaza al jugador a la cueva indicada si hay un túnel conectado directo.
-  Verifica trampas (pozos, wumpus, murciélagos) y avanza el turno de cacería.
+  Incrementa `self.movimientos_totales`, verifica trampas y avanza la cacería.
 
 
 2.12. verificar_murcielagos(self) y verificar_estado(self)
 ¿Qué hace?
   Comprueba si el jugador cayó en un pozo, fue atrapado por murciélagos gigantes
-  (reubicándolo al azar) o si se topó de frente con el Wumpus.
+  o si se topó de frente con el Wumpus, asignando la causa de muerte en caso de fallecer.
 
 
 2.13. lanzar_piedra(self, objetivo)
 ¿Qué hace?
-  Permite gastar 1 piedra arrojándola a una cueva contigua para escuchar el eco sonoro:
-  Splash en pozos, rugido en Wumpus, chillidos en murciélagos o crujido en roca.
+  Permite gastar 1 piedra arrojándola a una cueva contigua para escuchar el eco sonoro.
+  Incrementa `self.ecos_detectados` al detectar pozos, golpear al Wumpus, alertar murciélagos
+  o descubrir rocas inestables (+100 pts de exploración).
 
 
 2.14. agarrar(self)
 ¿Qué hace?
-  Recoge el cofre de oro si el explorador está en la cueva correcta, despertando
+  Recoge el cofre de oro si el explorador está en la cueva correcta (+1000 pts), despertando
   de inmediato al Wumpus en Modo Cacería.
 
 
 2.15. disparar(self, objetivo)
 ¿Qué hace?
   Dispara la flecha en línea recta a través de la cueva indicada. Si el Wumpus
-  se encuentra en esa trayectoria, muere de inmediato.
+  se encuentra en esa trayectoria, muere de inmediato (+1000 pts).
 
 
 2.16. mostrar_mapa(self, revelar_todo=False)
 ¿Qué hace?
   Imprime en consola el mapa con la numeración de cuevas en formato `[N:?]`,
   mostrando las conexiones con túneles abiertos (`---`, `|`) o derrumbados (`-x-`, `x`).
-  Oculta las cuevas no exploradas con niebla de guerra hasta el final de la partida.
 
 
 2.17. describir_cueva(self)
@@ -161,6 +168,26 @@ Funcionamiento en programación:
   Imprime en pantalla la descripción inmersiva de la cueva actual:
   título `ESTÁS EN LA CUEVA N`, pistas sensoriales completas, lista de túneles
   disponibles a los que se puede saltar, e inventario con alerta de cacería.
+
+
+2.18. calcular_puntuacion(self)
+¿Qué hace?
+  Calcula el puntaje detallado de la partida y el bonus multiplicativo de eficiencia:
+  - +50 pts por cada cueva explorada.
+  - +1000 pts por conseguir el oro.
+  - +1000 pts por abatir al Wumpus con la flecha.
+  - +100 pts por cada eco/peligro detectado con piedras.
+  - +200 pts por la flecha si no fue gastada.
+  - +50 pts por cada piedra conservada en la bolsa.
+  - +2000 pts por escapar con vida a la Cueva 1 con el oro.
+  - Multiplicador de eficiencia: compara la cantidad mínima teórica de movimientos
+    de ida y vuelta con los movimientos reales realizados por el jugador (hasta x2.50).
+
+
+2.19. imprimir_resumen_puntuacion(self)
+¿Qué hace?
+  Despliega en pantalla el reporte final con el desglose de puntos, la causa del desenlace
+  (muerte o victoria), el análisis de eficiencia de movimientos y la puntuación total obtenida.
 
 
 3. CONTROL Y BUCLE PRINCIPAL

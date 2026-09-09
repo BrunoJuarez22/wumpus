@@ -29,6 +29,15 @@ COLOR_NODE_PLAYER_BORDER = (137, 180, 250)
 COLOR_NODE_NEIGHBOR = (50, 60, 90)
 COLOR_NODE_NEIGHBOR_BORDER = (137, 220, 235)
 
+SIGNIFICADO_PERCEPCIONES = {
+    "Hedor": ("Hedor", "El Wumpus está cerca", COLOR_RED),
+    "Brisa": ("Brisa", "Pozo sin fondo cerca", COLOR_CYAN),
+    "Aleteo": ("Aleteo", "Murciélagos gigantes cerca", COLOR_PURPLE),
+    "Crujido": ("Crujido", "Roca inestable / derrumbe", COLOR_ORANGE),
+    "Brillo": ("Brillo", "Cofre de oro en esta cueva", COLOR_GOLD),
+    "Destello metálico": ("Destello", "Brújula antigua en el suelo", COLOR_CYAN)
+}
+
 
 class MundoWumpusCuadricula:
     def __init__(self, tamano=5, callback_log=None):
@@ -584,7 +593,7 @@ class WumpusPygameApp:
         self.log_mensajes.clear()
         self.juego = MundoWumpusCuadricula(tamano=5, callback_log=self.agregar_log)
         self.modo_accion = "mover"
-        self.agregar_log("Nueva expedición en la cuadrícula de 25 cuevas.", "victoria")
+        self.agregar_log("Nueva expedición.", "victoria")
         self.agregar_log("Encuentra el oro, tómalo y regresa a la Cueva 1 para escapar.", "normal")
 
     def _calcular_coordenadas_cuadricula(self):
@@ -940,20 +949,30 @@ class WumpusPygameApp:
             self.screen.blit(txt_bru_lect, (panel_x + 14, cur_y + 7))
             cur_y += 38
 
-        perc_rect = pygame.Rect(panel_x, cur_y, panel_w, 56)
+        percepciones = self.juego.percibir()
+        h_perc = 32 + max(1, len(percepciones)) * 20
+        perc_rect = pygame.Rect(panel_x, cur_y, panel_w, h_perc)
         pygame.draw.rect(self.screen, COLOR_PANEL, perc_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, perc_rect, 1, border_radius=8)
 
         txt_per_tit = self.font_bold.render("Percepciones en esta cueva:", True, COLOR_TEXT)
-        self.screen.blit(txt_per_tit, (panel_x + 14, cur_y + 8))
+        self.screen.blit(txt_per_tit, (panel_x + 14, cur_y + 7))
 
-        percepciones = self.juego.percibir()
         if percepciones:
-            txt_percs = self.font_bold.render("  *  " + "   *  ".join(percepciones), True, COLOR_GOLD)
+            line_p_y = cur_y + 28
+            for p in percepciones:
+                if p in SIGNIFICADO_PERCEPCIONES:
+                    nombre, desc, col = SIGNIFICADO_PERCEPCIONES[p]
+                    txt_p = self.font_normal.render(f"• {nombre}: {desc}", True, col)
+                else:
+                    txt_p = self.font_normal.render(f"• {p}", True, COLOR_GOLD)
+                self.screen.blit(txt_p, (panel_x + 16, line_p_y))
+                line_p_y += 19
         else:
-            txt_percs = self.font_normal.render("Silencio. No percibes peligros contiguos.", True, (110, 115, 140))
-        self.screen.blit(txt_percs, (panel_x + 14, cur_y + 30))
-        cur_y += 64
+            txt_percs = self.font_normal.render("• Silencio. No percibes peligros contiguos.", True, (120, 125, 150))
+            self.screen.blit(txt_percs, (panel_x + 16, cur_y + 28))
+
+        cur_y += h_perc + 8
 
         tun_rect = pygame.Rect(panel_x, cur_y, panel_w, 62)
         pygame.draw.rect(self.screen, COLOR_PANEL, tun_rect, border_radius=8)

@@ -805,6 +805,9 @@ class WumpusPygameApp:
             self.screen.blit(txt_line, (panel_x + 14, line_y))
             line_y += 20
 
+        txt_ctrls = self.font_small.render("Atajos: 1, 2, 3 o Clic en vértices | F: Disparo | P: Piedra | R: Reiniciar", True, COLOR_SUBTEXT)
+        self.screen.blit(txt_ctrls, (panel_x, self.height - 22))
+
 
 
     def _dibujar_estado_final(self):

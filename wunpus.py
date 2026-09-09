@@ -465,7 +465,7 @@ class MundoWumpusMosaico:
             nombre_meta = "la salida (Cueva 1)"
 
         if self.pos_jugador == obj_cueva:
-            return f"La aguja gira sobre sí misma: ¡{nombre_meta} está aquí!"
+            return f"La aguja gira: ¡{nombre_meta} está aquí!"
         else:
             xj, yj = self.coords[self.pos_jugador]
             xo, yo = self.coords[obj_cueva]
@@ -659,16 +659,17 @@ class WumpusPygameApp:
         self.width = 1140
         self.height = 760
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption("El Mundo del Wumpus - Mosaico de Pentágonos")
+        pygame.display.set_caption("El Mundo del Wumpus")
 
         self.clock = pygame.time.Clock()
         self.running = True
 
-        self.font_title = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 20, bold=True)
-        self.font_bold = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 14, bold=True)
-        self.font_btn = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13, bold=True)
-        self.font_normal = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13)
-        self.font_small = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 11)
+        self.font_title = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 22, bold=True)
+        self.font_bold = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 15, bold=True)
+        self.font_btn = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 14, bold=True)
+        self.font_normal = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 14)
+        self.font_small = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13)
+        self.font_nodo = pygame.font.SysFont(["segoe ui", "arial", "sans-serif"], 13, bold=True)
 
         self.log_mensajes = []
         self.modo_accion = "mover"
@@ -936,9 +937,9 @@ class WumpusPygameApp:
                     col = COLOR_GOLD if self.juego.tiene_oro else (255, 255, 255)
                     txt_nodo = self.font_bold.render(tag, True, col)
                 elif es_visitada:
-                    txt_nodo = self.font_small.render(str(c), True, COLOR_TEXT)
+                    txt_nodo = self.font_nodo.render(str(c), True, COLOR_TEXT)
                 else:
-                    txt_nodo = self.font_small.render(str(c), True, (90, 95, 125))
+                    txt_nodo = self.font_nodo.render(str(c), True, (110, 115, 145))
 
                 self.screen.blit(txt_nodo, (cx - txt_nodo.get_width() // 2, cy - txt_nodo.get_height() // 2))
 
@@ -948,7 +949,7 @@ class WumpusPygameApp:
 
         txt_titulo = self.font_title.render("EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
         self.screen.blit(txt_titulo, (panel_x, 14))
-        txt_sub = self.font_small.render("Mosaico de pentágonos (30 cuevas)", True, COLOR_SUBTEXT)
+        txt_sub = self.font_normal.render("30 cuevas", True, COLOR_SUBTEXT)
         self.screen.blit(txt_sub, (panel_x, 40))
 
         self.btn_mecanicas_rect = pygame.Rect(panel_x + panel_w - 125, 12, 125, 26)
@@ -1149,7 +1150,7 @@ class WumpusPygameApp:
             return
 
         box_w = 440
-        box_h = 320
+        box_h = 330
         box_x = 105
         box_y = 220
         modal_rect = pygame.Rect(box_x, box_y, box_w, box_h)
@@ -1200,11 +1201,11 @@ class WumpusPygameApp:
         self.screen.blit(txt_final, (box_x + 20, box_y + 262))
 
         txt_rein = self.font_bold.render("Pulsa R o clic en 'Nueva Partida' para reiniciar", True, COLOR_CYAN)
-        self.screen.blit(txt_rein, (modal_rect.centerx - txt_rein.get_width() // 2, box_y + 292))
+        self.screen.blit(txt_rein, (modal_rect.centerx - txt_rein.get_width() // 2, box_y + 298))
 
     def _dibujar_menu_mecanicas(self):
         box_w = 440
-        box_h = 420
+        box_h = 440
         box_x = 670
         box_y = 44
         self.dropdown_mecanicas_rect = pygame.Rect(box_x, box_y, box_w, box_h)
@@ -1238,8 +1239,8 @@ class WumpusPygameApp:
             ("   Oculta en una cueva. Al tomarla, te orienta con rumbo", COLOR_TEXT),
             ("   magnético hacia el oro o hacia la salida (Cueva 1).", COLOR_TEXT),
             ("", COLOR_TEXT),
-            ("5. Mosaico de Pentágonos Siempre Ganable:", COLOR_GOLD),
-            ("   Mapa compuesto de pentágonos con ruta transitable.", COLOR_TEXT),
+            ("5. Mapa Siempre Ganable:", COLOR_GOLD),
+            ("   Red de 30 cuevas con ruta transitable garantizada.", COLOR_TEXT),
             ("", COLOR_TEXT),
             ("6. Sistema de Puntuación y Eficiencia:", COLOR_GOLD),
             ("   Gana puntos por explorar, oro, cazar y recursos.", COLOR_TEXT),
@@ -1253,7 +1254,7 @@ class WumpusPygameApp:
                 continue
             txt_surf = self.font_small.render(linea, True, color)
             self.screen.blit(txt_surf, (box_x + 16, text_y))
-            text_y += 16
+            text_y += 18
 
 
 if __name__ == "__main__":

@@ -312,7 +312,7 @@ class MundoWumpusDodecaedro:
     def agarrar(self):
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             self.tiene_oro = True
-            self.notificar("¡HAS COGIDO EL ORO! 💰 Regresa a la Cueva 0 para escapar.", "victoria")
+            self.notificar("¡HAS COGIDO EL ORO! Regresa a la Cueva 0 para escapar.", "victoria")
             
             if self.wumpus_vivo:
                 self.modo_caceria = True
@@ -369,7 +369,7 @@ class WumpusPygameApp:
         self.width = 1100
         self.height = 740
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption("🏹 El Mundo del Wumpus - Grafo de Pentágonos Pegados")
+        pygame.display.set_caption("El Mundo del Wumpus - Mapa de Pentágonos Pegados")
 
         self.clock = pygame.time.Clock()
         self.running = True
@@ -405,8 +405,8 @@ class WumpusPygameApp:
         self.log_mensajes.clear()
         self.juego = MundoWumpusDodecaedro(callback_log=self.agregar_log)
         self.modo_accion = "mover"
-        self.agregar_log("⚔️ ¡Nueva expedición en la red pentagonal!", "victoria")
-        self.agregar_log("Las aristas son túneles y los vértices son las 20 cuevas.", "normal")
+        self.agregar_log("¡Nueva expedición en el mapa!", "victoria")
+        self.agregar_log("Los pasadizos son túneles que unen las 20 cuevas.", "normal")
         self.agregar_log("Encuentra el oro y regresa a la Cueva 0 para escapar.", "normal")
 
     def _calcular_coordenadas_vertices(self):
@@ -676,7 +676,7 @@ class WumpusPygameApp:
 
         txt_titulo = self.font_title.render("EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
         self.screen.blit(txt_titulo, (panel_x, 16))
-        txt_sub = self.font_small.render("Grafo de pentágonos pegados (Dodecaedro de 20 cuevas)", True, COLOR_SUBTEXT)
+        txt_sub = self.font_small.render("Mapa de pentágonos pegados (20 cuevas)", True, COLOR_SUBTEXT)
         self.screen.blit(txt_sub, (panel_x, 44))
 
         self.btn_mecanicas_rect = pygame.Rect(panel_x + panel_w - 150, 14, 150, 26)
@@ -697,7 +697,7 @@ class WumpusPygameApp:
             sufijo = "s" if dist > 1 else ""
             banner_rect = pygame.Rect(panel_x, banner_y, panel_w, 36)
             pygame.draw.rect(self.screen, COLOR_RED, banner_rect, border_radius=6)
-            txt_cac = self.font_bold.render(f"🚨 ¡¡WUMPUS EN CACERÍA!! Acechando a {dist} cueva{sufijo}", True, (20, 20, 30))
+            txt_cac = self.font_bold.render(f"¡¡WUMPUS EN CACERÍA!! Acechando a {dist} cueva{sufijo}", True, (20, 20, 30))
             self.screen.blit(txt_cac, (panel_x + 14, banner_y + 8))
             inv_y = banner_y + 44
         else:
@@ -707,20 +707,20 @@ class WumpusPygameApp:
         pygame.draw.rect(self.screen, COLOR_PANEL, inv_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, inv_rect, 1, border_radius=8)
 
-        txt_inv_titulo = self.font_bold.render("🎒 Estado del Explorador", True, COLOR_GOLD)
+        txt_inv_titulo = self.font_bold.render("Estado del Explorador", True, COLOR_GOLD)
         self.screen.blit(txt_inv_titulo, (panel_x + 14, inv_y + 10))
 
-        txt_fl = self.font_normal.render(f"🏹 Flechas: {self.juego.flechas}", True, COLOR_TEXT)
+        txt_fl = self.font_normal.render(f"Flechas: {self.juego.flechas}", True, COLOR_TEXT)
         self.screen.blit(txt_fl, (panel_x + 16, inv_y + 34))
 
-        txt_pd = self.font_normal.render(f"🪨 Piedras: {self.juego.piedras}", True, COLOR_TEXT)
+        txt_pd = self.font_normal.render(f"Piedras: {self.juego.piedras}", True, COLOR_TEXT)
         self.screen.blit(txt_pd, (panel_x + 160, inv_y + 34))
 
-        oro_str = "¡CONSEGUIDO! 🏆" if self.juego.tiene_oro else "No"
-        txt_oro = self.font_normal.render(f"💰 Oro: {oro_str}", True, COLOR_GOLD if self.juego.tiene_oro else COLOR_TEXT)
+        oro_str = "¡CONSEGUIDO!" if self.juego.tiene_oro else "No"
+        txt_oro = self.font_normal.render(f"Oro: {oro_str}", True, COLOR_GOLD if self.juego.tiene_oro else COLOR_TEXT)
         self.screen.blit(txt_oro, (panel_x + 16, inv_y + 58))
 
-        txt_pos = self.font_normal.render(f"📍 Cueva actual: {self.juego.pos_jugador}", True, COLOR_CYAN)
+        txt_pos = self.font_normal.render(f"Cueva actual: {self.juego.pos_jugador}", True, COLOR_CYAN)
         self.screen.blit(txt_pos, (panel_x + 160, inv_y + 58))
 
         perc_y = inv_y + 94
@@ -728,7 +728,7 @@ class WumpusPygameApp:
         pygame.draw.rect(self.screen, COLOR_PANEL, perc_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, perc_rect, 1, border_radius=8)
 
-        txt_per_tit = self.font_bold.render("👂 Percepciones en esta cueva:", True, COLOR_TEXT)
+        txt_per_tit = self.font_bold.render("Percepciones en esta cueva:", True, COLOR_TEXT)
         self.screen.blit(txt_per_tit, (panel_x + 14, perc_y + 8))
 
         percepciones = self.juego.percibir()
@@ -743,7 +743,7 @@ class WumpusPygameApp:
         pygame.draw.rect(self.screen, COLOR_PANEL, tun_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, tun_rect, 1, border_radius=8)
 
-        txt_tun_tit = self.font_bold.render(f"🚪 Túneles desde Cueva {self.juego.pos_jugador}:", True, COLOR_TEXT)
+        txt_tun_tit = self.font_bold.render(f"Túneles desde Cueva {self.juego.pos_jugador}:", True, COLOR_TEXT)
         self.screen.blit(txt_tun_tit, (panel_x + 14, tun_y + 8))
 
         vecinos = self.juego.grafo.get(self.juego.pos_jugador, [])
@@ -756,7 +756,7 @@ class WumpusPygameApp:
             self.botones_vecinos.append((b_rect, v))
             pygame.draw.rect(self.screen, (45, 50, 75), b_rect, border_radius=5)
             txt_btn_v = self.font_bold.render(f"[{idx+1}] Cueva {v}", True, COLOR_CYAN)
-            self.screen.blit(txt_btn_v, (bx + 20, by + 5))
+            self.screen.blit(txt_btn_v, (b_rect.centerx - txt_btn_v.get_width() // 2, b_rect.centery - txt_btn_v.get_height() // 2))
 
         btn_y = tun_y + 74
         self.btn_disparar_rect = pygame.Rect(panel_x, btn_y, 130, 36)
@@ -773,15 +773,19 @@ class WumpusPygameApp:
         pygame.draw.rect(self.screen, c_agar, self.btn_agarrar_rect, border_radius=6)
         pygame.draw.rect(self.screen, (45, 48, 65), self.btn_reiniciar_rect, border_radius=6)
 
-        txt_b_disp = self.font_bold.render("🏹 Disparar (F)", True, (20, 20, 30) if self.modo_accion == "disparar" else COLOR_TEXT)
-        txt_b_lanz = self.font_bold.render("🪨 Piedra (P)", True, (20, 20, 30) if self.modo_accion == "lanzar" else COLOR_TEXT)
-        txt_b_agar = self.font_bold.render("💰 Agarrar (G)", True, (20, 20, 30) if c_agar == COLOR_GREEN else COLOR_TEXT)
-        txt_b_rein = self.font_bold.render("🔄 Nueva Red Dodecaédrica (R)", True, COLOR_TEXT)
+        txt_b_disp = self.font_bold.render("Disparar (F)", True, (20, 20, 30) if self.modo_accion == "disparar" else COLOR_TEXT)
+        txt_b_lanz = self.font_bold.render("Piedra (P)", True, (20, 20, 30) if self.modo_accion == "lanzar" else COLOR_TEXT)
+        txt_b_agar = self.font_bold.render("Agarrar (G)", True, (20, 20, 30) if c_agar == COLOR_GREEN else COLOR_TEXT)
+        txt_b_rein = self.font_bold.render("Nueva Partida (R)", True, COLOR_TEXT)
 
-        self.screen.blit(txt_b_disp, (panel_x + 14, btn_y + 9))
-        self.screen.blit(txt_b_lanz, (panel_x + 154, btn_y + 9))
-        self.screen.blit(txt_b_agar, (panel_x + 292, btn_y + 9))
-        self.screen.blit(txt_b_rein, (panel_x + 85, btn_y + 51))
+        self.screen.blit(txt_b_disp, (self.btn_disparar_rect.centerx - txt_b_disp.get_width() // 2,
+                                       self.btn_disparar_rect.centery - txt_b_disp.get_height() // 2))
+        self.screen.blit(txt_b_lanz, (self.btn_lanzar_rect.centerx - txt_b_lanz.get_width() // 2,
+                                       self.btn_lanzar_rect.centery - txt_b_lanz.get_height() // 2))
+        self.screen.blit(txt_b_agar, (self.btn_agarrar_rect.centerx - txt_b_agar.get_width() // 2,
+                                       self.btn_agarrar_rect.centery - txt_b_agar.get_height() // 2))
+        self.screen.blit(txt_b_rein, (self.btn_reiniciar_rect.centerx - txt_b_rein.get_width() // 2,
+                                       self.btn_reiniciar_rect.centery - txt_b_rein.get_height() // 2))
 
         log_y = btn_y + 86
         log_h = self.height - log_y - 35
@@ -789,7 +793,7 @@ class WumpusPygameApp:
         pygame.draw.rect(self.screen, (16, 16, 26), log_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, log_rect, 1, border_radius=8)
 
-        txt_log_tit = self.font_bold.render("📜 Bitácora de la Aventura", True, COLOR_GOLD)
+        txt_log_tit = self.font_bold.render("Bitácora de la Aventura", True, COLOR_GOLD)
         self.screen.blit(txt_log_tit, (panel_x + 14, log_y + 8))
 
         line_y = log_y + 30
@@ -813,7 +817,7 @@ class WumpusPygameApp:
             self.screen.blit(txt_line, (panel_x + 14, line_y))
             line_y += 20
 
-        txt_ctrls = self.font_small.render("Atajos: 1, 2, 3 o Clic en vértices | F: Disparo | P: Piedra | R: Reiniciar", True, COLOR_SUBTEXT)
+        txt_ctrls = self.font_small.render("Atajos: 1, 2, 3 o Clic en cuevas | F: Disparo | P: Piedra | R: Reiniciar", True, COLOR_SUBTEXT)
         self.screen.blit(txt_ctrls, (panel_x, self.height - 22))
 
 
@@ -822,21 +826,21 @@ class WumpusPygameApp:
             banner_rect = pygame.Rect(50, 16, 560, 46)
             pygame.draw.rect(self.screen, (30, 80, 50), banner_rect, border_radius=8)
             pygame.draw.rect(self.screen, COLOR_GREEN, banner_rect, 2, border_radius=8)
-            txt_vic = self.font_bold.render("🏆 ¡¡HAS ESCAPADO CON EL ORO!! ¡¡VICTORIA!! (Pulsa R)", True, COLOR_GREEN)
+            txt_vic = self.font_bold.render("¡¡HAS ESCAPADO CON EL ORO!! ¡¡VICTORIA!! (Pulsa R)", True, COLOR_GREEN)
             self.screen.blit(txt_vic, (banner_rect.centerx - txt_vic.get_width() // 2, banner_rect.centery - txt_vic.get_height() // 2))
 
         elif not self.juego.vivo:
             banner_rect = pygame.Rect(50, 16, 560, 46)
             pygame.draw.rect(self.screen, (70, 20, 30), banner_rect, border_radius=8)
             pygame.draw.rect(self.screen, COLOR_RED, banner_rect, 2, border_radius=8)
-            txt_der = self.font_bold.render("💀 HAS MUERTO EN LA CUEVA. Cueva revelada. (Pulsa R)", True, COLOR_RED)
+            txt_der = self.font_bold.render("HAS MUERTO EN LA CUEVA. Cueva revelada. (Pulsa R)", True, COLOR_RED)
             self.screen.blit(txt_der, (banner_rect.centerx - txt_der.get_width() // 2, banner_rect.centery - txt_der.get_height() // 2))
 
     def _dibujar_menu_mecanicas(self):
         box_x = 635
         box_y = 48
         box_w = 440
-        box_h = 575
+        box_h = 400
         self.dropdown_mecanicas_rect = pygame.Rect(box_x, box_y, box_w, box_h)
 
         pygame.draw.rect(self.screen, (20, 22, 34), self.dropdown_mecanicas_rect, border_radius=10)
@@ -862,7 +866,7 @@ class WumpusPygameApp:
             ("1. Modo Cacería del Wumpus", COLOR_RED, [
                 "• Original: El Wumpus era estático y solo se movía al fallar flechas.",
                 "• Nuevo: ¡Al coger el Oro, el Wumpus despierta e inicia cacería!",
-                "  Te persigue activamente por el grafo cada 2 turnos para devorarte.",
+                "  Te persigue activamente por el mapa cada 2 turnos para devorarte.",
                 "  Debes huir a tiempo de regreso hasta la Cueva 0 para escapar."
             ]),
             ("2. Lanzamiento de Piedras (3 en bolsa)", COLOR_CYAN, [
@@ -873,21 +877,10 @@ class WumpusPygameApp:
                 "    - Chillidos y aleteo: Nido de murciélagos gigantes.",
                 "    - Crujido de piedra: Techo inestable a punto de desplomarse."
             ]),
-            ("3. Derrumbe Dinámico de Túneles", COLOR_ORANGE, [
-                "• Original: La red de 30 túneles del dodecaedro era inalterable.",
-                "• Nuevo: Hay una cueva inestable (percepción 'Crujido'). Al pisarla,",
-                "  un derrumbe violento sella un túnel para siempre ('[X]'),",
-                "  obligándote a buscar rutas alternativas en el grafo."
-            ]),
-            ("4. Garantía de Solubilidad", COLOR_GREEN, [
+            ("3. Partida Siempre Ganable", COLOR_GREEN, [
                 "• Original: Los pozos al azar podían bloquear la cueva inicial.",
-                "• Nuevo: El mundo valida que siempre exista un camino",
-                "  seguro transitable para conseguir el oro y escapar."
-            ]),
-            ("5. Niebla de Guerra y Mosaico Pentagonal", COLOR_GOLD, [
-                "• Original: Aventura clásica puramente en texto en terminal ciega.",
-                "• Nuevo: Mosaico gráfico de pentágonos pegados con iluminación,",
-                "  percepciones en tiempo real y revelación total al terminar."
+                "• Nuevo: El mapa siempre se genera con un camino seguro",
+                "  para encontrar el oro y regresar a la salida."
             ])
         ]
 

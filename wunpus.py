@@ -69,12 +69,12 @@ class MundoWumpus:
         self.movimientos_totales = 0
         self.ecos_detectados = 0
         self.causa_muerte = ""
-        self.mensajes = ["Nueva expedición. Encuentra el oro, tómalo y regresa a Cueva 1."]
+        self.mensajes = [("Nueva expedición. Encuentra el oro, tómalo y regresa a la Cueva 1 para escapar.", False)]
         
         self.inicializar_elementos()
 
-    def notificar(self, mensaje):
-        self.mensajes.append(mensaje)
+    def notificar(self, mensaje, alerta=False):
+        self.mensajes.append((mensaje, alerta))
 
     def _cueva_a_xy(self, c):
         return (c - 1) % self.tamano, (c - 1) // self.tamano
@@ -175,17 +175,17 @@ class MundoWumpus:
         vecinos = self.grafo.get(self.pos_jugador, [])
         
         if any(v == self.pos_wumpus for v in vecinos) and self.wumpus_vivo:
-            percepciones.append("Hedor (Wumpus cerca)")
+            percepciones.append(("Hedor insoportable", "El Wumpus acecha en una cueva contigua. (Puedes usar 'disparar N' o 'lanzar N')"))
         if any(v in self.pos_pozos for v in vecinos):
-            percepciones.append("Brisa (Pozo cerca)")
+            percepciones.append(("Brisa fría y húmeda", "Sientes la corriente de un pozo cercano. (Usa 'lanzar N' con piedra para tantear)"))
         if any(v in self.pos_murcielagos for v in vecinos):
-            percepciones.append("Aleteo (Murciélagos cerca)")
+            percepciones.append(("Aleteo distante", "Murciélagos gigantes habitan cerca. ('lanzar N' confirma su presencia)"))
         if any(v == self.pos_derrumbe for v in vecinos) and not self.derrumbe_ocurrido:
-            percepciones.append("Crujido (Roca inestable)")
+            percepciones.append(("Crujido de piedra", "Techo inestable a punto de desplomarse. Cruzar por ahí puede causar derrumbe."))
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
-            percepciones.append("Brillo (¡Oro aquí!)")
+            percepciones.append(("Brillo resplandeciente", "¡El cofre de oro está en esta cueva! (Escribe 'tomar' o 't' para recogerlo)"))
         if self.pos_jugador == self.pos_brujula and not self.tiene_brujula:
-            percepciones.append("Destello metálico (¡Brújula aquí!)")
+            percepciones.append(("Destello metálico", "Hay una brújula antigua en el suelo. (Escribe 'tomar' o 't' para recogerla)"))
             
         return percepciones
 
@@ -194,7 +194,7 @@ class MundoWumpus:
         if vecinos:
             self.pos_wumpus = random.choice(vecinos)
             if self.pos_wumpus == self.pos_jugador:
-                self.notificar("El Wumpus entró a tu cueva mientras huía.")
+                self.notificar("¡EL WUMPUS ENTRÓ A TU CUEVA MIENTRAS HUÍA!", alerta=True)
                 self.verificar_estado()
 
     def cazar_jugador(self):
@@ -205,12 +205,12 @@ class MundoWumpus:
             
             dist = len(camino) - 2
             if dist == 0:
-                self.notificar("El Wumpus ha entrado a tu cueva.")
+                self.notificar("¡EL WUMPUS HA ENTRADO A TU CUEVA Y TE HA DEVORADO!", alerta=True)
                 self.causa_muerte = "El Wumpus te alcanzó y te devoró."
                 self.vivo = False
             else:
                 sufijo = "s" if dist > 1 else ""
-                self.notificar(f"El suelo tiembla... El Wumpus avanzó. Está a {dist} cueva{sufijo} de ti.")
+                self.notificar(f"¡EL SUELO TIEMBLA! El Wumpus avanzó; está a solo {dist} cueva{sufijo} de ti.", alerta=True)
         else:
             self.mover_wumpus_aleatorio()
 
@@ -235,7 +235,7 @@ class MundoWumpus:
                 self.bloqueos.add(arista)
                 self.derrumbe_ocurrido = True
                 bloqueado = True
-                self.notificar(f"Derrumbe: túnel entre Cueva {self.pos_jugador} y Cueva {v} sellado.")
+                self.notificar(f"¡DERRUMBE! Un colapso de roca ha sellado el túnel entre la Cueva {self.pos_jugador} y la Cueva {v}.", alerta=True)
                 break
             else:
                 self.grafo[self.pos_jugador].append(v)
@@ -245,7 +245,7 @@ class MundoWumpus:
                 
         if not bloqueado:
             self.derrumbe_ocurrido = True
-            self.notificar("Un temblor sacude la cueva, pero los túneles resisten.")
+            self.notificar("Un temblor sacudió la cueva con fuerza, pero los túneles resistieron.", alerta=False)
 
     def mover(self, nueva_pos):
         vecinos = self.grafo.get(self.pos_jugador, [])
@@ -253,7 +253,7 @@ class MundoWumpus:
             self.pos_jugador = nueva_pos
             self.habitaciones_visitadas.add(nueva_pos)
             self.movimientos_totales += 1
-            self.notificar(f"Te has desplazado a la Cueva {nueva_pos}.")
+            self.notificar(f"Te has desplazado a la Cueva {nueva_pos}.", alerta=False)
             
             if self.pos_jugador == self.pos_derrumbe and not self.derrumbe_ocurrido:
                 self.activar_derrumbe()
@@ -266,7 +266,7 @@ class MundoWumpus:
             if self.vivo and self.modo_caceria and self.wumpus_vivo:
                 if self.distraccion_wumpus > 0:
                     self.distraccion_wumpus -= 1
-                    self.notificar(f"Wumpus distraído comiendo cebo ({self.distraccion_wumpus} turno(s) restantes).")
+                    self.notificar(f"El Wumpus sigue devorando el cebo ({self.distraccion_wumpus} turno(s) de distracción restantes).", alerta=False)
                 else:
                     self.turnos_caceria += 1
                     if self.turnos_caceria % 2 == 0:
@@ -274,17 +274,16 @@ class MundoWumpus:
                     else:
                         dist = self._distancia_al_jugador()
                         sufijo = "s" if dist > 1 else ""
-                        self.notificar(f"El Wumpus te acecha a {dist} cueva{sufijo} de distancia...")
+                        self.notificar(f"¡PELIGRO! El Wumpus te acecha a {dist} cueva{sufijo} de distancia...", alerta=True)
         else:
             vecinos = self.grafo.get(self.pos_jugador, [])
-            self.notificar(f"Sin túnel directo a Cueva {nueva_pos}. Conectadas: {vecinos}")
+            self.notificar(f"No hay túnel directo hacia la Cueva {nueva_pos}. Cuevas conectadas: {vecinos}", alerta=False)
 
     def verificar_murcielagos(self):
         if self.pos_jugador in self.pos_murcielagos:
-            self.notificar("¡Murciélagos gigantes te atrapan y te llevan por el aire!")
             posibles = [c for c in range(1, self.total_cuevas + 1) if c != self.pos_jugador]
             destino = random.choice(posibles)
-            self.notificar(f"Te dejan caer en la Cueva {destino}.")
+            self.notificar(f"¡MURCIÉLAGOS GIGANTES! Te arrebataron en pleno vuelo y te dejaron caer en la Cueva {destino}.", alerta=True)
             bat_actual = self.pos_jugador
             self.pos_jugador = destino
             self.habitaciones_visitadas.add(destino)
@@ -298,72 +297,72 @@ class MundoWumpus:
 
     def verificar_estado(self):
         if self.pos_jugador in self.pos_pozos:
-            self.notificar("Caíste en un pozo sin fondo. Fin del juego.")
-            self.causa_muerte = "Caíste en un pozo."
+            self.notificar("¡CAÍSTE EN UN POZO SIN FONDO! Fin del juego.", alerta=True)
+            self.causa_muerte = "Caíste en un pozo sin fondo."
             self.vivo = False
         elif self.pos_jugador == self.pos_wumpus and self.wumpus_vivo:
-            self.notificar("El Wumpus te ha devorado. Fin del juego.")
+            self.notificar("¡EL WUMPUS TE HA DEVORADO! Fin del juego.", alerta=True)
             self.causa_muerte = "El Wumpus te ha devorado."
             self.vivo = False
 
     def lanzar_piedra(self, objetivo):
         if self.piedras <= 0:
-            self.notificar("Ya no te quedan piedras en la bolsa.")
+            self.notificar("Ya no te quedan piedras en la bolsa.", alerta=False)
             return
 
         if objetivo not in self.grafo.get(self.pos_jugador, []):
-            self.notificar(f"Solo puedes lanzar piedras a cuevas conectadas: {self.grafo.get(self.pos_jugador, [])}")
+            self.notificar(f"Solo puedes lanzar piedras a cuevas conectadas: {self.grafo.get(self.pos_jugador, [])}", alerta=False)
             return
 
         self.piedras -= 1
-        self.notificar(f"Lanzas una piedra hacia la Cueva {objetivo}...")
+        self.notificar(f"Lanzas una piedra hacia la Cueva {objetivo}...", alerta=False)
 
         if objetivo in self.pos_pozos:
-            self.notificar("  > Splash. Eco de piedra cayendo al fondo de un pozo.")
+            self.notificar("  > Splash. Escuchas el eco de la piedra cayendo al agua profunda de un pozo.", alerta=False)
             self.ecos_detectados += 1
         elif objetivo == self.pos_wumpus and self.wumpus_vivo:
-            self.notificar("  > Rugido. Golpeaste al Wumpus y ruge; huye a otra cueva.")
+            self.notificar("  > ¡Rugido ensordecedor! Golpeaste al Wumpus y huyó a otra cueva.", alerta=True)
             self.ecos_detectados += 1
             self.mover_wumpus_aleatorio()
         elif objetivo in self.pos_murcielagos:
-            self.notificar("  > Chillidos y aleteo. Hay murciélagos en esa cueva.")
+            self.notificar("  > Chillidos y aleteo. Hay un nido de murciélagos gigantes en esa cueva.", alerta=False)
             self.ecos_detectados += 1
         elif objetivo == self.pos_derrumbe and not self.derrumbe_ocurrido:
-            self.notificar("  > Crujido y polvo. Techo inestable a punto de caer.")
+            self.notificar("  > Crujido y desprendimiento de polvo. El techo es frágil e inestable.", alerta=False)
             self.ecos_detectados += 1
         else:
-            self.notificar("  > La piedra rueda por el suelo de roca sin novedad. Parece seguro.")
+            self.notificar("  > La piedra rueda por el suelo de roca sin novedad. Parece seguro.", alerta=False)
 
     def lanzar_cebo(self, objetivo):
         if self.cebos <= 0:
-            self.notificar("Ya no te quedan cebos en el morral.")
+            self.notificar("Ya no te quedan cebos en el morral.", alerta=False)
             return
 
         vecinos = self.grafo.get(self.pos_jugador, [])
         if objetivo not in vecinos:
-            self.notificar(f"Solo puedes lanzar el cebo a una cueva conectada: {vecinos}")
+            self.notificar(f"Solo puedes lanzar el cebo a una cueva conectada: {vecinos}", alerta=False)
             return
 
         self.cebos -= 1
-        self.notificar(f"Lanzas carne hacia la Cueva {objetivo}...")
+        self.notificar(f"Lanzas carne fresca hacia la Cueva {objetivo}...", alerta=False)
 
         if objetivo == self.pos_wumpus and self.wumpus_vivo:
             self.distraccion_wumpus = 2
             self.cebo_distrajo_wumpus = True
-            self.notificar("  > El Wumpus devora la carne y se distrae por 2 turnos.")
+            self.notificar("¡ÉXITO! El Wumpus devora la carne con avidez y se distrae por 2 turnos.", alerta=True)
         elif self.modo_caceria and self.wumpus_vivo:
             self.distraccion_wumpus = 2
             self.cebo_distrajo_wumpus = True
             if objetivo not in self.pos_pozos:
                 self.pos_wumpus = objetivo
-            self.notificar("  > El Wumpus huele la carne, salta a esa cueva y se distrae 2 turnos.")
+            self.notificar("¡CEBO EFECTIVO! El Wumpus saltó hacia esa cueva por el olor a carne (2 turnos de distracción).", alerta=True)
         else:
-            self.notificar("  > El cebo queda en el suelo de la cueva.")
+            self.notificar("El cebo queda en el suelo de la cueva.", alerta=False)
 
     def consultar_brujula(self, silencioso=False):
         if not self.tiene_brujula:
             if not silencioso:
-                self.notificar("No tienes ninguna brújula en tu inventario.")
+                self.notificar("No tienes ninguna brújula en tu inventario.", alerta=False)
             return None
 
         if not self.tiene_oro:
@@ -374,7 +373,7 @@ class MundoWumpus:
             nombre_meta = "la salida (Cueva 1)"
 
         if self.pos_jugador == obj_cueva:
-            msg = f"La aguja gira: ¡{nombre_meta} está aquí!"
+            msg = f"La aguja gira sobre sí misma: ¡{nombre_meta} está en esta cueva!"
         else:
             xj, yj = self._cueva_a_xy(self.pos_jugador)
             xo, yo = self._cueva_a_xy(obj_cueva)
@@ -389,10 +388,10 @@ class MundoWumpus:
             elif dy < 0: rumbo = "Sur"
             elif dx > 0: rumbo = "Este"
             else: rumbo = "Oeste"
-            msg = f"Apunta al {rumbo} (hacia {nombre_meta})."
+            msg = f"La aguja apunta hacia el {rumbo} (hacia {nombre_meta})."
 
         if not silencioso:
-            self.notificar(f"[Brújula]: {msg}")
+            self.notificar(f"[Brújula]: {msg}", alerta=False)
         return msg
 
     def tomar(self):
@@ -401,39 +400,39 @@ class MundoWumpus:
         if self.pos_jugador == self.pos_oro and not self.tiene_oro:
             self.tiene_oro = True
             algo_tomado = True
-            self.notificar("¡Has tomado el cofre de oro (+1000 pts)! Regresa a Cueva 1 para escapar.")
+            self.notificar("¡COFRE DE ORO RECOGIDO (+1000 pts)! Ahora debes regresar a la Cueva 1 para escapar.", alerta=True)
             if self.tiene_brujula:
-                self.notificar("(La brújula ahora apunta de vuelta a Cueva 1)")
+                self.notificar("(La brújula ahora apunta de vuelta a la Cueva 1)", alerta=False)
             
             if self.wumpus_vivo:
                 self.modo_caceria = True
-                self.notificar("¡El Wumpus despertó por el olor a oro! Modo cacería activado.")
+                self.notificar("¡EL WUMPUS DESPERTÓ CON EL OLOR DEL ORO! Modo cacería activado; avanzará hacia ti.", alerta=True)
 
         if self.pos_jugador == self.pos_brujula and not self.tiene_brujula:
             self.tiene_brujula = True
             algo_tomado = True
-            self.notificar("¡Has tomado la brújula (+300 pts)! Te orienta hacia el objetivo.")
+            self.notificar("¡BRÚJULA RECUPERADA (+300 pts)! Su aguja magnética te indicará el rumbo al oro.", alerta=True)
 
         if not algo_tomado:
             if self.tiene_oro and self.pos_jugador == self.pos_oro:
-                self.notificar("Ya tienes el oro en tu mochila.")
+                self.notificar("Ya tienes el oro en tu mochila.", alerta=False)
             elif self.tiene_brujula and self.pos_jugador == self.pos_brujula:
-                self.notificar("Ya tomaste la brújula de esta cueva.")
+                self.notificar("Ya tomaste la brújula de esta cueva.", alerta=False)
             else:
-                self.notificar("No hay nada que tomar en esta cueva.")
+                self.notificar("No hay nada que tomar en esta cueva.", alerta=False)
 
     def disparar(self, objetivo):
         if self.flechas <= 0:
-            self.notificar("Ya no te quedan flechas.")
+            self.notificar("Ya no te quedan flechas.", alerta=False)
             return
 
         vecinos = self.grafo.get(self.pos_jugador, [])
         if objetivo not in vecinos:
-            self.notificar(f"Solo puedes disparar a través de un túnel conectado: {vecinos}")
+            self.notificar(f"Solo puedes disparar a través de un túnel conectado: {vecinos}", alerta=False)
             return
 
         self.flechas -= 1
-        self.notificar(f"Disparas la flecha hacia la Cueva {objetivo}.")
+        self.notificar(f"Disparas la flecha hacia la Cueva {objetivo}...", alerta=False)
 
         xj, yj = self._cueva_a_xy(self.pos_jugador)
         xo, yo = self._cueva_a_xy(objetivo)
@@ -448,20 +447,21 @@ class MundoWumpus:
             if cur_cueva == self.pos_wumpus and self.wumpus_vivo:
                 self.wumpus_vivo = False
                 impacto = True
-                self.notificar(f"¡Has matado al Wumpus en la Cueva {cur_cueva} (+1000 pts)!")
+                self.notificar(f"¡FLECHA CERTERA! Has matado al Wumpus en la Cueva {cur_cueva} (+1000 pts).", alerta=True)
                 if self.modo_caceria:
                     self.modo_caceria = False
-                    self.notificar("La cueva queda en silencio. La cacería ha terminado.")
+                    self.notificar("La cueva queda en silencio sepulcral. La cacería ha terminado.", alerta=True)
                 break
             cur_x += paso_x
             cur_y += paso_y
 
         if not impacto:
-            self.notificar("La flecha chocó contra la roca. Has fallado.")
+            self.notificar("La flecha chocó contra la pared de roca. Has fallado.", alerta=False)
             if self.wumpus_vivo and not self.modo_caceria:
                 self.mover_wumpus_aleatorio()
 
     def mostrar_mapa(self, revelar_todo=False):
+        print("  --- MAPA DE CUEVAS (J=Tú, .=Visitada, ?=Niebla) ---")
         for y in range(self.tamano - 1, -1, -1):
             fila_nodos = "  "
             for x in range(self.tamano):
@@ -508,9 +508,18 @@ class MundoWumpus:
                 print(fila_vert)
 
     def describir_cueva(self):
+        print(f"\nESTÁS EN LA CUEVA {self.pos_jugador}")
+        print("-" * 64)
+
         percepciones = self.percibir()
-        p_txt = ", ".join(percepciones) if percepciones else "Silencio (sin peligros)"
-        print(f"ESTÁS EN CUEVA {self.pos_jugador} | {p_txt}")
+        print("[Percepciones sensoriales]:")
+        if percepciones:
+            for nombre, desc in percepciones:
+                print(f"  * {nombre}: {desc}")
+        else:
+            print("  * Silencio. No percibes peligros contiguos.")
+
+        print("-" * 64)
 
         if self.tiene_brujula:
             lectura = self.consultar_brujula(silencioso=True)
@@ -519,7 +528,7 @@ class MundoWumpus:
         vecinos = self.grafo.get(self.pos_jugador, [])
         lista_vecinos = ", ".join(f"Cueva {v}" for v in vecinos)
         ej_v = vecinos[0] if vecinos else 2
-        print(f"[Túneles]: {lista_vecinos} (ej: escribe '{ej_v}' o 'mover {ej_v}')")
+        print(f"[Túneles disponibles]: Puedes moverte a: {lista_vecinos} (ej: escribe '{ej_v}' o 'mover {ej_v}')")
 
         if self.modo_caceria and self.wumpus_vivo:
             if self.distraccion_wumpus > 0:
@@ -663,9 +672,9 @@ def imprimir_ayuda():
 def ejecutar_juego():
     juego = MundoWumpus()
     limpiar_consola()
-    print("=========================================================")
-    print("           BIENVENIDO AL MUNDO DEL WUMPUS                ")
-    print("=========================================================")
+    print("======================================================================")
+    print("                    BIENVENIDO AL MUNDO DEL WUMPUS                    ")
+    print("======================================================================")
     print("Objetivo: Explora las cuevas, encuentra el oro, tómalo y")
     print("regresa hasta la Cueva 1 para escapar.")
     print("Escribe 'ayuda' para ver los comandos disponibles.")
@@ -677,51 +686,75 @@ def ejecutar_juego():
         limpiar_consola()
 
         if not juego.vivo:
-            print("================== HAS MUERTO EN LA CUEVA ==================")
+            print("======================================================================")
+            print("!!!!!!!!!!!!!!!!!!!     HAS MUERTO EN LA CUEVA     !!!!!!!!!!!!!!!!!!!")
+            print("======================================================================")
             if juego.mensajes:
-                for m in juego.mensajes: print(f"  * {m}")
+                print()
+                for m, _ in juego.mensajes:
+                    print(f"  >>> {m}")
+            print()
             juego.mostrar_mapa(revelar_todo=True)
             juego.imprimir_resumen_puntuacion()
             break
 
         if juego.pos_jugador == 1 and juego.tiene_oro:
-            print("****************** ¡VICTORIA! ESCAPASTE CON EL ORO ******************")
+            print("**********************************************************************")
+            print("*******************  ¡HAS ESCAPADO CON EL ORO!  **********************")
+            print("*******************        ¡HAS GANADO!         **********************")
+            print("**********************************************************************")
             if juego.mensajes:
-                for m in juego.mensajes: print(f"  * {m}")
+                print()
+                for m, _ in juego.mensajes:
+                    print(f"  >>> {m}")
+            print()
             juego.mostrar_mapa(revelar_todo=True)
             juego.imprimir_resumen_puntuacion()
             break
 
-        print("=================== EL MUNDO DEL WUMPUS ===================")
+        print("======================== EL MUNDO DEL WUMPUS =========================")
+
         if juego.mensajes:
-            print("[Último suceso]:")
-            for m in juego.mensajes:
-                print(f"  * {m}")
+            alertas = [m for m, es_alerta in juego.mensajes if es_alerta]
+            normales = [m for m, es_alerta in juego.mensajes if not es_alerta]
+
+            if alertas:
+                print("======================================================================")
+                for a in alertas:
+                    print(f"  >>> {a}")
+                print("======================================================================")
+
+            if normales:
+                print("[Último suceso]:")
+                for n in normales:
+                    print(f"  * {n}")
+                print("-" * 64)
+
             juego.mensajes.clear()
 
-        print("--- MAPA EXPLORADO (J=Tú, .=Visitada, ?=Niebla) ---")
         juego.mostrar_mapa()
         juego.describir_cueva()
 
-        percepciones_actuales = juego.percibir()
+        percepciones_actuales = [nombre for nombre, _ in juego.percibir()]
         vecinos_actuales = juego.grafo.get(juego.pos_jugador, [])
         ej_cueva = vecinos_actuales[0] if vecinos_actuales else 2
 
         if juego.pos_jugador == juego.pos_oro and not juego.tiene_oro:
-            prompt_texto = f"¿Qué deseas hacer? (escribe 'tomar' para el oro o '{ej_cueva}' para moverte): "
+            prompt_texto = f"\n¿Qué deseas hacer? (escribe 'tomar' para el oro o '{ej_cueva}' para moverte): "
         elif juego.pos_jugador == juego.pos_brujula and not juego.tiene_brujula:
-            prompt_texto = f"¿Qué deseas hacer? (escribe 'tomar' para la brújula o '{ej_cueva}' para moverte): "
+            prompt_texto = f"\n¿Qué deseas hacer? (escribe 'tomar' para la brújula o '{ej_cueva}' para moverte): "
         elif juego.modo_caceria and juego.wumpus_vivo and juego.cebos > 0:
-            prompt_texto = f"¿Qué deseas hacer? (ej: '{ej_cueva}' para moverte o 'cebo {ej_cueva}' para distraer): "
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: '{ej_cueva}' para moverte o 'cebo {ej_cueva}' para distraer): "
         elif any("Hedor" in p for p in percepciones_actuales) and juego.wumpus_vivo:
-            prompt_texto = f"¿Qué deseas hacer? (ej: 'disparar {ej_cueva}', 'lanzar {ej_cueva}' o '{ej_cueva}'): "
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: 'disparar {ej_cueva}', 'lanzar {ej_cueva}' o '{ej_cueva}'): "
         elif any("Brisa" in p for p in percepciones_actuales):
-            prompt_texto = f"¿Qué deseas hacer? (ej: 'lanzar {ej_cueva}' con piedra o 'mover {ej_cueva}'): "
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: 'lanzar {ej_cueva}' con piedra o 'mover {ej_cueva}'): "
         else:
-            prompt_texto = f"¿Qué deseas hacer? (ej: 'mover {ej_cueva}' o simplemente '{ej_cueva}'): "
+            prompt_texto = f"\n¿Qué deseas hacer? (ej: 'mover {ej_cueva}' o simplemente '{ej_cueva}'): "
 
-        print("-" * 59)
-        print("Consejo: Escribe 'ayuda' para ver comandos | 'salir' para terminar")
+        print("-" * 64)
+        print("Consejo: Escribe 'ayuda' (o '?') para ver todos los comandos.")
+        print("=" * 64)
         entrada = input(prompt_texto)
         accion, args = parse_comando(entrada)
 
@@ -731,25 +764,25 @@ def ejecutar_juego():
         if accion == "mover":
             juego.mover(args)
         elif accion == "mover_invalido":
-            juego.notificar("[!] Especifica a qué cueva moverte. Ejemplos: 'mover 2' o '2'.")
+            juego.notificar("[!] Especifica a qué cueva moverte. Ejemplos: 'mover 2' o simplemente '2'.", alerta=False)
         elif accion == "disparar":
             juego.disparar(args)
         elif accion == "disparar_invalido":
-            juego.notificar("[!] Especifica hacia qué cueva disparar. Ejemplo: 'disparar 2' o 'f 2'.")
+            juego.notificar("[!] Especifica hacia qué cueva disparar. Ejemplo: 'disparar 2' o 'f 2'.", alerta=False)
         elif accion == "lanzar":
             juego.lanzar_piedra(args)
         elif accion == "lanzar_invalido":
-            juego.notificar("[!] Especifica a qué cueva lanzar la piedra. Ejemplo: 'lanzar 2' o 'p 2'.")
+            juego.notificar("[!] Especifica a qué cueva lanzar la piedra. Ejemplo: 'lanzar 2' o 'p 2'.", alerta=False)
         elif accion == "cebo":
             juego.lanzar_cebo(args)
         elif accion == "cebo_invalido":
-            juego.notificar("[!] Especifica a qué cueva lanzar el cebo. Ejemplo: 'cebo 2' o 'c 2'.")
+            juego.notificar("[!] Especifica a qué cueva lanzar el cebo. Ejemplo: 'cebo 2' o 'c 2'.", alerta=False)
         elif accion == "tomar":
             juego.tomar()
         elif accion == "brujula":
             juego.consultar_brujula()
         elif accion == "mapa":
-            juego.notificar("Mapa actualizado.")
+            juego.notificar("Mapa actualizado.", alerta=False)
         elif accion == "novedades":
             limpiar_consola()
             imprimir_novedades()
@@ -760,13 +793,15 @@ def ejecutar_juego():
             input("\nPresiona Enter para regresar a la partida...")
         elif accion == "salir":
             limpiar_consola()
-            print("================== HAS SALIDO DE LA CUEVA ==================")
+            print("======================================================================")
+            print("                        HAS SALIDO DE LA CUEVA                        ")
+            print("======================================================================")
             juego.causa_muerte = "Saliste de la cueva."
             juego.mostrar_mapa(revelar_todo=True)
             juego.imprimir_resumen_puntuacion()
             break
         else:
-            juego.notificar(f"[!] Comando '{args}' no reconocido. Escribe 'ayuda' para consultar comandos.")
+            juego.notificar(f"[!] Comando '{args}' no reconocido. Escribe 'ayuda' para consultar comandos.", alerta=False)
 
 
 if __name__ == "__main__":

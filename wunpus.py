@@ -65,12 +65,10 @@ class MundoWumpusDodecaedro:
     def construir_grafo_dodecaedro(self):
         self.grafo.clear()
         
-        # Central pentagon: 0, 1, 2, 3, 4
         for i in range(5):
             self._agregar_arista(i, (i + 1) % 5)
             self._agregar_arista(i, i + 5)
             
-        # Middle ring 1 (5..9) connects to Middle ring 2 (10..14)
         for i in range(5):
             r1 = i + 5
             r2_a = 10 + i
@@ -78,22 +76,16 @@ class MundoWumpusDodecaedro:
             self._agregar_arista(r1, r2_a)
             self._agregar_arista(r1, r2_b)
             
-        # Middle ring 2 (10..14) connects to Outer ring (15..19)
         for i in range(5):
             self._agregar_arista(10 + i, 15 + i)
             
-        # Outer pentagon: 15, 16, 17, 18, 19
         for i in range(5):
             self._agregar_arista(15 + i, 15 + (i + 1) % 5)
             
-        # Definir las 11 caras pentagonales visibles
         self.caras_pentagonales = []
-        # Cara 0 (Centro)
         self.caras_pentagonales.append([0, 1, 2, 3, 4])
-        # Caras 1..5 (Anillo medio A)
         for i in range(5):
             self.caras_pentagonales.append([i, (i + 1) % 5, 5 + (i + 1) % 5, 10 + i, 5 + i])
-        # Caras 6..10 (Anillo medio B)
         for i in range(5):
             self.caras_pentagonales.append([10 + i, 15 + i, 15 + (i + 1) % 5, 10 + (i + 1) % 5, 5 + (i + 1) % 5])
 
@@ -139,7 +131,7 @@ class MundoWumpusDodecaedro:
     def inicializar_elementos(self):
         while True:
             cuevas = list(range(20))
-            cuevas.remove(0) # El inicio siempre es seguro en la cueva 0
+            cuevas.remove(0)
             
             self.pos_wumpus = random.choice(cuevas)
             cuevas.remove(self.pos_wumpus)
@@ -154,10 +146,8 @@ class MundoWumpusDodecaedro:
             self.pos_derrumbe = random.choice(cuevas)
             cuevas.remove(self.pos_derrumbe)
             
-            # Colocar 3 pozos en cuevas restantes
             self.pos_pozos = random.sample(cuevas, 3)
             
-            # Validar que exista camino transitable hasta el oro
             if self._existe_camino_seguro(0, self.pos_oro):
                 break
 
@@ -347,9 +337,7 @@ class MundoWumpusDodecaedro:
         self.flechas -= 1
         self.notificar(f"¡La flecha silba hacia la cueva {objetivo}!", "accion")
 
-        # La flecha viaja hacia la cueva y puede atravesar
         camino_flecha = [objetivo]
-        # Continuar la flecha 1 cueva más si está alineada
         vecinos_dest = [v for v in self.grafo.get(objetivo, []) if v != self.pos_jugador]
         if vecinos_dest:
             camino_flecha.append(random.choice(vecinos_dest))
@@ -426,22 +414,18 @@ class WumpusPygameApp:
         cx, cy = 330, 365
         r0, r1, r2, r3 = 70, 145, 215, 290
 
-        # Anillo 0: Vértices 0..4 (Pentágono Central)
         for i in range(5):
             ang = -math.pi / 2 + i * (2 * math.pi / 5)
             self.coords_cuevas[i] = (int(cx + r0 * math.cos(ang)), int(cy + r0 * math.sin(ang)))
 
-        # Anillo 1: Vértices 5..9 (Conexiones radiales desde Anillo 0)
         for i in range(5):
             ang = -math.pi / 2 + i * (2 * math.pi / 5)
             self.coords_cuevas[i + 5] = (int(cx + r1 * math.cos(ang)), int(cy + r1 * math.sin(ang)))
 
-        # Anillo 2: Vértices 10..14 (Desfasados 36° para formar pentágonos)
         for i in range(5):
             ang = -math.pi / 2 + math.pi / 5 + i * (2 * math.pi / 5)
             self.coords_cuevas[10 + i] = (int(cx + r2 * math.cos(ang)), int(cy + r2 * math.sin(ang)))
 
-        # Anillo 3: Vértices 15..19 (Pentágono Exterior)
         for i in range(5):
             ang = -math.pi / 2 + math.pi / 5 + i * (2 * math.pi / 5)
             self.coords_cuevas[15 + i] = (int(cx + r3 * math.cos(ang)), int(cy + r3 * math.sin(ang)))
@@ -492,12 +476,10 @@ class WumpusPygameApp:
                 self.running = False
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # 1. Clic en botón de menú desplegable de mecánicas
                 if self.btn_mecanicas_rect and self.btn_mecanicas_rect.collidepoint(event.pos):
                     self.mostrar_menu_mecanicas = not self.mostrar_menu_mecanicas
                     continue
 
-                # 2. Interacción exclusiva si el menú está desplegado
                 if self.mostrar_menu_mecanicas:
                     if self.btn_cerrar_mecanicas_rect and self.btn_cerrar_mecanicas_rect.collidepoint(event.pos):
                         self.mostrar_menu_mecanicas = False
@@ -507,7 +489,6 @@ class WumpusPygameApp:
                         self.mostrar_menu_mecanicas = False
                     continue
 
-                # Comprobar clics en botones de acción
                 if self.btn_disparar_rect.collidepoint(event.pos):
                     if self.juego.flechas > 0 and self.juego.vivo:
                         self.modo_accion = "disparar" if self.modo_accion != "disparar" else "mover"
@@ -531,13 +512,11 @@ class WumpusPygameApp:
                 elif self.btn_reiniciar_rect.collidepoint(event.pos):
                     self.nueva_partida()
 
-                # Clic en botones de acceso directo a vecinos (1, 2, 3)
                 for btn_rect, cueva_vec in self.botones_vecinos:
                     if btn_rect.collidepoint(event.pos):
                         self.interactuar_con_cueva(cueva_vec)
                         break
 
-                # Clic sobre vértices/cuevas en el mapa
                 if cueva_hover is not None:
                     self.interactuar_con_cueva(cueva_hover)
 
@@ -588,13 +567,11 @@ class WumpusPygameApp:
         vecinos_jugador = self.juego.grafo.get(self.juego.pos_jugador, [])
         partida_terminada = (not self.juego.vivo) or (self.juego.pos_jugador == 0 and self.juego.tiene_oro)
 
-        # 1. Dibujar las 11 caras pentagonales pegadas (polígonos de fondo)
         for cara in self.juego.caras_pentagonales:
             puntos_poligono = [self.coords_cuevas[v] for v in cara]
             pygame.draw.polygon(self.screen, COLOR_FACE, puntos_poligono)
             pygame.draw.polygon(self.screen, COLOR_FACE_BORDER, puntos_poligono, 1)
 
-        # 2. Dibujar las aristas (los túneles/pasadizos que unen los vértices)
         aristas_dibujadas = set()
         for u, vecinos in self.juego.grafo.items():
             for v in vecinos:
@@ -604,7 +581,6 @@ class WumpusPygameApp:
                     p1 = self.coords_cuevas[u]
                     p2 = self.coords_cuevas[v]
 
-                    # Si el jugador está en u o v, iluminar el túnel
                     es_tunel_activo = (u == self.juego.pos_jugador or v == self.juego.pos_jugador)
                     color_t = (80, 85, 120) if es_tunel_activo else COLOR_TUNNEL
                     color_ti = COLOR_CYAN if (es_tunel_activo and self.juego.vivo) else COLOR_TUNNEL_INNER
@@ -612,7 +588,6 @@ class WumpusPygameApp:
                     pygame.draw.line(self.screen, color_t, p1, p2, 8)
                     pygame.draw.line(self.screen, color_ti, p1, p2, 4)
 
-        # Dibujar derrumbes bloqueados sobre aristas
         for u, v in self.juego.bloqueos:
             p1 = self.coords_cuevas[u]
             p2 = self.coords_cuevas[v]
@@ -622,7 +597,6 @@ class WumpusPygameApp:
             pygame.draw.line(self.screen, COLOR_RED, (mid_x - 7, mid_y - 7), (mid_x + 7, mid_y + 7), 3)
             pygame.draw.line(self.screen, COLOR_RED, (mid_x - 7, mid_y + 7), (mid_x + 7, mid_y - 7), 3)
 
-        # 3. Dibujar los vértices (las 20 cuevas)
         time_ms = pygame.time.get_ticks()
         for cueva, (cx, cy) in self.coords_cuevas.items():
             es_jugador = (cueva == self.juego.pos_jugador)
@@ -642,7 +616,6 @@ class WumpusPygameApp:
                 pygame.draw.circle(self.screen, COLOR_NODE_FOG, (cx, cy), r)
                 pygame.draw.circle(self.screen, COLOR_NODE_FOG_BORDER, (cx, cy), r, 2)
 
-            # Resaltar si es cueva vecina disponible
             if es_vecino and self.juego.vivo:
                 color_halo = COLOR_GREEN
                 if self.modo_accion == "disparar":
@@ -655,13 +628,11 @@ class WumpusPygameApp:
                 else:
                     pygame.draw.circle(self.screen, color_halo, (cx, cy), r + 3, 1)
 
-            # Contenido del vértice (cueva)
             if es_jugador:
                 avatar = "🤠" if not self.juego.tiene_oro else "💰"
                 txt_av = self.font_emoji.render(avatar, True, COLOR_TEXT)
                 self.screen.blit(txt_av, (cx - txt_av.get_width() // 2, cy - txt_av.get_height() // 2))
 
-                # Percepciones alrededor del jugador
                 percepciones = self.juego.percibir()
                 iconos = []
                 if "Hedor" in percepciones: iconos.append("🦨")
@@ -699,18 +670,15 @@ class WumpusPygameApp:
                     self.screen.blit(txt_fog, (cx - txt_fog.get_width() // 2, cy - txt_fog.get_height() // 2))
 
 
-
     def _dibujar_panel_derecho(self):
         panel_x = 655
         panel_w = 415
 
-        # 1. Cabecera y Botón de Nuevas Mecánicas
         txt_titulo = self.font_title.render("EL MUNDO DEL WUMPUS", True, COLOR_GOLD)
         self.screen.blit(txt_titulo, (panel_x, 16))
         txt_sub = self.font_small.render("Grafo de pentágonos pegados (Dodecaedro de 20 cuevas)", True, COLOR_SUBTEXT)
         self.screen.blit(txt_sub, (panel_x, 44))
 
-        # Botón de menú desplegable de mecánicas
         self.btn_mecanicas_rect = pygame.Rect(panel_x + panel_w - 150, 14, 150, 26)
         mouse_pos = pygame.mouse.get_pos()
         es_hover_mec = self.btn_mecanicas_rect.collidepoint(mouse_pos)
@@ -723,7 +691,6 @@ class WumpusPygameApp:
         self.screen.blit(txt_btn_mec, (self.btn_mecanicas_rect.centerx - txt_btn_mec.get_width() // 2,
                                        self.btn_mecanicas_rect.centery - txt_btn_mec.get_height() // 2))
 
-        # 2. Banner de Cacería Activa
         banner_y = 68
         if self.juego.modo_caceria and self.juego.wumpus_vivo:
             dist = self.juego._distancia_al_jugador()
@@ -736,7 +703,6 @@ class WumpusPygameApp:
         else:
             inv_y = banner_y
 
-        # 3. Tarjeta de Inventario y Estado
         inv_rect = pygame.Rect(panel_x, inv_y, panel_w, 86)
         pygame.draw.rect(self.screen, COLOR_PANEL, inv_rect, border_radius=8)
         pygame.draw.rect(self.screen, COLOR_BORDER, inv_rect, 1, border_radius=8)
@@ -757,7 +723,6 @@ class WumpusPygameApp:
         txt_pos = self.font_normal.render(f"📍 Cueva actual: {self.juego.pos_jugador}", True, COLOR_CYAN)
         self.screen.blit(txt_pos, (panel_x + 160, inv_y + 58))
 
-        # 4. Percepciones
         perc_y = inv_y + 94
         perc_rect = pygame.Rect(panel_x, perc_y, panel_w, 60)
         pygame.draw.rect(self.screen, COLOR_PANEL, perc_rect, border_radius=8)
@@ -773,7 +738,6 @@ class WumpusPygameApp:
             txt_percs = self.font_normal.render("Silencio absoluto. No percibes peligros contiguos.", True, (110, 115, 140))
         self.screen.blit(txt_percs, (panel_x + 14, perc_y + 32))
 
-        # 5. Túneles conectados y botones de salto
         tun_y = perc_y + 68
         tun_rect = pygame.Rect(panel_x, tun_y, panel_w, 66)
         pygame.draw.rect(self.screen, COLOR_PANEL, tun_rect, border_radius=8)
@@ -794,7 +758,6 @@ class WumpusPygameApp:
             txt_btn_v = self.font_bold.render(f"[{idx+1}] Cueva {v}", True, COLOR_CYAN)
             self.screen.blit(txt_btn_v, (bx + 20, by + 5))
 
-        # 6. Botones de Acción
         btn_y = tun_y + 74
         self.btn_disparar_rect = pygame.Rect(panel_x, btn_y, 130, 36)
         self.btn_lanzar_rect = pygame.Rect(panel_x + 140, btn_y, 130, 36)
@@ -820,7 +783,6 @@ class WumpusPygameApp:
         self.screen.blit(txt_b_agar, (panel_x + 292, btn_y + 9))
         self.screen.blit(txt_b_rein, (panel_x + 85, btn_y + 51))
 
-        # 7. Bitácora de Eventos
         log_y = btn_y + 86
         log_h = self.height - log_y - 35
         log_rect = pygame.Rect(panel_x, log_y, panel_w, log_h)
@@ -855,7 +817,6 @@ class WumpusPygameApp:
         self.screen.blit(txt_ctrls, (panel_x, self.height - 22))
 
 
-
     def _dibujar_estado_final(self):
         if self.juego.pos_jugador == 0 and self.juego.tiene_oro:
             banner_rect = pygame.Rect(50, 16, 560, 46)
@@ -878,18 +839,15 @@ class WumpusPygameApp:
         box_h = 575
         self.dropdown_mecanicas_rect = pygame.Rect(box_x, box_y, box_w, box_h)
 
-        # Fondo con sombra y borde dorado
         pygame.draw.rect(self.screen, (20, 22, 34), self.dropdown_mecanicas_rect, border_radius=10)
         pygame.draw.rect(self.screen, COLOR_GOLD, self.dropdown_mecanicas_rect, 2, border_radius=10)
 
-        # Cabecera del menú
         header_rect = pygame.Rect(box_x, box_y, box_w, 36)
         pygame.draw.rect(self.screen, (32, 35, 52), header_rect, border_top_left_radius=10, border_top_right_radius=10)
         pygame.draw.rect(self.screen, COLOR_BORDER, header_rect, 1, border_top_left_radius=10, border_top_right_radius=10)
         txt_head = self.font_bold.render("NOVEDADES VS. WUMPUS CLASICO (1972)", True, COLOR_GOLD)
         self.screen.blit(txt_head, (box_x + 14, box_y + 9))
 
-        # Botón de cerrar [X]
         self.btn_cerrar_mecanicas_rect = pygame.Rect(box_x + box_w - 30, box_y + 6, 24, 24)
         mouse_pos = pygame.mouse.get_pos()
         es_hover_x = self.btn_cerrar_mecanicas_rect.collidepoint(mouse_pos)
@@ -900,7 +858,6 @@ class WumpusPygameApp:
         self.screen.blit(txt_x, (self.btn_cerrar_mecanicas_rect.centerx - txt_x.get_width() // 2,
                                  self.btn_cerrar_mecanicas_rect.centery - txt_x.get_height() // 2))
 
-        # Lista de nuevas mecánicas
         mecanicas = [
             ("1. Modo Cacería del Wumpus", COLOR_RED, [
                 "• Original: El Wumpus era estático y solo se movía al fallar flechas.",
@@ -922,10 +879,10 @@ class WumpusPygameApp:
                 "  un derrumbe violento sella un túnel para siempre ('[X]'),",
                 "  obligándote a buscar rutas alternativas en el grafo."
             ]),
-            ("4. Garantía de Solubilidad con BFS", COLOR_GREEN, [
+            ("4. Garantía de Solubilidad", COLOR_GREEN, [
                 "• Original: Los pozos al azar podían bloquear la cueva inicial.",
-                "• Nuevo: Búsqueda en Anchura (BFS) valida matemáticamente que",
-                "  siempre exista un camino seguro transitable de ida y vuelta."
+                "• Nuevo: El mundo valida que siempre exista un camino",
+                "  seguro transitable para conseguir el oro y escapar."
             ]),
             ("5. Niebla de Guerra y Mosaico Pentagonal", COLOR_GOLD, [
                 "• Original: Aventura clásica puramente en texto en terminal ciega.",
@@ -943,7 +900,6 @@ class WumpusPygameApp:
                 curr_y += 16
             curr_y += 6
 
-        # Pie de página
         txt_foot = self.font_small.render("Haz clic en [X], en el botón o presiona ESC / M para cerrar", True, COLOR_SUBTEXT)
         self.screen.blit(txt_foot, (box_x + box_w // 2 - txt_foot.get_width() // 2, box_y + box_h - 22))
 
